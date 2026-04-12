@@ -1,0 +1,203 @@
+:root {
+  --text: #6b6375;
+  --text-h: #08060d;
+  --bg: #fff;
+  --border: #e5e4e7;
+  --code-bg: #f4f3ec;
+  --accent: #aa3bff;
+  --accent-bg: rgba(170, 59, 255, 0.1);
+  --accent-border: rgba(170, 59, 255, 0.5);
+
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+
+  font: 18px/145% var(--sans);
+  letter-spacing: 0.18px;
+  color-scheme: light dark;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  @media (max-width: 1024px) {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #9ca3af;
+    --text-h: #f3f4f6;
+    --bg: #16171d;
+    --border: #2e303a;
+    --code-bg: #1f2028;
+    --accent: #c084fc;
+    --accent-bg: rgba(192, 132, 252, 0.15);
+    --accent-border: rgba(192, 132, 252, 0.5);
+  }
+}
+
+body {
+  margin: 0;
+}
+
+#app {
+  width: 1126px;
+  max-width: 100%;
+  margin: 0 auto;
+  text-align: left;
+  border-inline: 1px solid var(--border);
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.app-header {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.app-header__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  padding: 12px 20px;
+  @media (max-width: 1024px) {
+    padding: 10px 16px;
+  }
+}
+
+.app-header__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-h);
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.app-header__banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+
+.app-header__field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-header__field[hidden] {
+  display: none;
+}
+
+.app-header__label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-h);
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.app-header__select {
+  font: inherit;
+  font-size: 15px;
+  color: var(--text-h);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 28px 6px 10px;
+  min-width: 200px;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b6375' d='M3 4.5 6 8l3-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+
+  &:hover {
+    border-color: var(--accent-border);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .app-header__select {
+    background-color: var(--code-bg);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239ca3af' d='M3 4.5 6 8l3-3.5'/%3E%3C/svg%3E");
+  }
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.app-workspace {
+  flex: 1;
+  min-height: 0;
+  padding: 20px;
+  box-sizing: border-box;
+  @media (max-width: 1024px) {
+    padding: 16px;
+  }
+}
+
+.spa-view {
+  color: var(--text);
+}
+
+.spa-view__title {
+  font-family: var(--heading);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0 0 8px;
+}
+
+.spa-view__msg {
+  margin: 0;
+  font-size: 15px;
+  line-height: 145%;
+}
+
+.spa-view__msg--sub {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--text);
+  opacity: 0.9;
+}
+
+.spa-view__msg--sub code {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 2px 6px;
+  background: var(--code-bg);
+  border-radius: 4px;
+  color: var(--text-h);
+}
+
+.spa-view__test-img {
+  display: block;
+  margin-top: 12px;
+  max-width: min(200px, 100%);
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.spa-view--empty .spa-view__msg {
+  color: var(--text);
+}
