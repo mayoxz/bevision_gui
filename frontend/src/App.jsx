@@ -4,7 +4,17 @@ import { SpaViewport } from './viz/SpaViewport.jsx'
 export default function App() {
   const [dataset, setDataset] = useState('nus-mini')
   const [runKind, setRunKind] = useState('eval')
-  const showRunKind = dataset === 'nus-mini'
+
+  const runKindOptions = {
+    'nus-mini': [
+      { value: 'eval', label: 'eval (평가)' },
+      { value: 'smoke', label: 'smoke (학습)' },
+    ],
+    'nuscenes': [
+      { value: 'eval', label: 'eval (평가)' },
+    ],
+  }
+  const showRunKind = !!runKindOptions[dataset]
 
   return (
     <>
@@ -19,9 +29,14 @@ export default function App() {
                 className="app-header__select"
                 aria-label="데이터셋 선택"
                 value={dataset}
-                onChange={(e) => setDataset(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setDataset(next)
+                  setRunKind((runKindOptions[next] ?? [])[0]?.value ?? 'eval')
+                }}
               >
                 <option value="nus-mini">NuScenes-mini</option>
+                <option value="nuscenes">NuScenes (full)</option>
               </select>
             </div>
             {showRunKind ? (
@@ -34,8 +49,9 @@ export default function App() {
                   value={runKind}
                   onChange={(e) => setRunKind(e.target.value)}
                 >
-                  <option value="eval">eval (평가)</option>
-                  <option value="smoke">smoke (학습)</option>
+                  {(runKindOptions[dataset] ?? []).map(({ value, label }) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
                 </select>
               </div>
             ) : null}
