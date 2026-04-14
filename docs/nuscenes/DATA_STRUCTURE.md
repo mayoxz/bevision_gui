@@ -1,6 +1,9 @@
 # NuScenes (full) 데이터 구조 문서
 
-Web GUI 시각화를 위한 `data/nuscenes/` 출력 데이터 구조 분석 (2026-04-13 기준)
+Web GUI 시각화를 위한 `data/nuscenes/` 출력 데이터 구조 분석 (2026-04-14 기준)
+
+이 경로의 산출물은 **full NuScenes 데이터셋에 대해 이미 학습된 모델을 불러와 추론/평가한 결과**를 정리한 것이다.  
+즉 `nus-mini/smoke`처럼 학습 중 생성된 로그가 아니라, inference/eval 실행 결과와 시각화 산출물만 포함한다.
 
 **배치 위치**: `frontend/public/data/nuscenes/` 아래.  
 Vite 개발/배포 시 정적 URL은 **`/data/nuscenes/`** (로컬 전용).  
@@ -18,7 +21,8 @@ data/nuscenes/
     └── vis_data/
     │   └── config.py                      # 실험 설정 스냅샷 (MMEngine)
     └── vis_final_integrated/
-        └── <scene>__<camera>__<token>.jpg # 카메라별 시각화 이미지
+        ├── index.json                      # 예시 이미지 목록
+        └── <scene>__<camera>__<token>.jpg # 추론 결과 통합 시각화 이미지
 ```
 
 ---
@@ -66,15 +70,22 @@ data/nuscenes/
 - **형식**: JPEG 이미지
 - **파일명 패턴**: `<scene_token>__<camera_name>__<timestamp_token>.jpg`
   - 예: `n008-2018-08-01-15-34-25-0400__CAM_FRONT__1533152214512404.jpg`
-- **내용**: BEVFusion inference 결과가 3D bounding box로 오버레이된 카메라 뷰 이미지
-- 현재 1개 샘플 이미지 포함 (`CAM_FRONT`)
+- **실제 내용**: 파일명에는 `CAM_FRONT`가 들어가지만, 현재 예시로 포함된 2개 JPG는 **단일 전방 카메라 원본이 아니라 6개 카메라 뷰를 한 장으로 합친 통합 이미지**다.
+- **해상도**: 현재 샘플 2장 모두 `4800x1800`
+- **시각화 내용**: BEVFusion 추론 결과가 3D bounding box와 함께 오버레이된 멀티뷰 합성 이미지
+
+### `vis_final_integrated/index.json`
+
+- **형식**: JSON
+- **내용**: GUI에서 표시할 이미지 파일명 목록
+- **현재 값**: 예시 이미지 2장 등록
 
 ---
 
 ## 4. `<timestamp>.log`
 
 - **형식**: 텍스트 로그
-- **내용**: 실행 환경 정보 (GPU, CUDA, PyTorch), config 덤프, step별 로그
+- **내용**: 실행 환경 정보 (GPU, CUDA, PyTorch), config 덤프, 추론/평가 실행 로그
 
 ---
 
@@ -83,7 +94,8 @@ data/nuscenes/
 | 항목 | nus-mini | nuscenes (full) |
 |------|----------|-----------------|
 | 데이터셋 | NuScenes mini (소규모) | NuScenes full |
+| 실행 성격 | eval + smoke(train) 예시 포함 | 사전학습 모델 기반 eval/inference 결과 |
 | ann_file | `nuscenes_mini_infos_*.pkl` | `nuscenes_infos_*.pkl` |
 | eval JSON | 완전한 메트릭 (10클래스 × 4dist + 오류) | 현재는 partial (data_time, time만) |
-| vis 이미지 | 없음 | `vis_final_integrated/*.jpg` |
+| vis 이미지 | 없음 | `vis_final_integrated/*.jpg` 2장 + `index.json` |
 | smoke (학습) | JSONL scalars 포함 | 해당 없음 (eval only) |
