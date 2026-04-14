@@ -1,6 +1,6 @@
 # BEVision Work Dirs 데이터 구조 문서
 
-Web GUI 시각화를 위한 출력 데이터 구조 분석 (2026-04-12 기준)
+Web GUI 시각화를 위한 출력 데이터 구조 분석 (2026-04-14 기준)
 
 **배치 위치**: 리포지토리에서는 `frontend/public/data/nus-mini/` 아래에 둔다. Vite 개발/배포 시 정적 URL은 **`/data/nus-mini/`** (로컬 전용). 프로덕션에서는 R2 등 공개 URL을 코드에서 `VITE_DATA_BASE_URL` 등으로 바꿔 같은 상대 경로(`nus-mini/...`)를 붙여 읽는 방식을 권장한다.
 
@@ -10,9 +10,6 @@ Web GUI 시각화를 위한 출력 데이터 구조 분석 (2026-04-12 기준)
 
 ```
 data/nus-mini/
-├── first_val_demo.png             # (선택) 데모 이미지
-├── DATA_STRUCTURE.md              # 본 문서
-│
 ├── eval/                          # 평가(eval) 실행 결과
 │   ├── bevfusion_mini_debug.py    # 실험 config (복사본)
 │   └── 20260410_212913/           # 실행 타임스탬프 디렉토리
@@ -78,7 +75,7 @@ data/nus-mini/
 
 - **형식**: JSONL (JSON Lines) — 한 줄 = 한 step의 스칼라
 - **내용**: 학습 중 스텝별 loss / lr / 메모리 등 트레이닝 지표
-- `vis_data/20260410_210326.json`과 `vis_data/scalars.json`은 **완전히 동일한 파일** (162줄)
+- `vis_data/20260410_210326.json`과 `vis_data/scalars.json`은 **완전히 동일한 파일** (현재 163 레코드)
 
 #### 1줄(1 step) JSON 필드 구조
 
@@ -100,7 +97,7 @@ data/nus-mini/
 
 #### 데이터 범위 (현재 실행 기준)
 
-- step: 10 ~ 1620 (step=10 간격, 총 162 records)
+- step: 10 ~ 1630 (step=10 간격, 총 163 records)
 - epoch: 1 (단일 epoch smoke test)
 - loss 초반: ~2346 → 이후 ~7.5 수준으로 빠르게 수렴
 - grad_norm: 초반 50 step은 NaN, 이후 정상화
