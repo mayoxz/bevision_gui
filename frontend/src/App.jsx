@@ -1,19 +1,31 @@
 import { useState } from 'react'
 import { SpaViewport } from './viz/SpaViewport.jsx'
 
-export default function App() {
-  const [dataset, setDataset] = useState('nus-mini')
-  const [runKind, setRunKind] = useState('eval')
+const DATASET_OPTIONS = [
+  { value: 'epoch-logs', label: 'Epoch logs' },
+  { value: 'nus-mini', label: 'NuScenes-mini' },
+  { value: 'nuscenes', label: 'NuScenes (full)' },
+]
 
-  const runKindOptions = {
-    'nus-mini': [
-      { value: 'eval', label: 'eval (평가)' },
-      { value: 'smoke', label: 'smoke (학습)' },
-    ],
-    'nuscenes': [
-      { value: 'eval', label: 'eval (평가)' },
-    ],
-  }
+const DEFAULT_DATASET = DATASET_OPTIONS[0].value
+
+const runKindOptions = {
+  'nus-mini': [
+    { value: 'eval', label: 'eval (평가)' },
+    { value: 'smoke', label: 'smoke (학습)' },
+  ],
+  'nuscenes': [
+    { value: 'eval', label: 'eval (평가)' },
+  ],
+}
+
+function defaultRunKind(dataset) {
+  return runKindOptions[dataset]?.[0]?.value ?? 'eval'
+}
+
+export default function App() {
+  const [dataset, setDataset] = useState(DEFAULT_DATASET)
+  const [runKind, setRunKind] = useState(() => defaultRunKind(DEFAULT_DATASET))
   const showRunKind = !!runKindOptions[dataset]
 
   return (
@@ -32,12 +44,12 @@ export default function App() {
                 onChange={(e) => {
                   const next = e.target.value
                   setDataset(next)
-                  setRunKind((runKindOptions[next] ?? [])[0]?.value ?? 'eval')
+                  setRunKind(defaultRunKind(next))
                 }}
               >
-                <option value="epoch-logs">Epoch logs</option>
-                <option value="nus-mini">NuScenes-mini</option>
-                <option value="nuscenes">NuScenes (full)</option>
+                {DATASET_OPTIONS.map(({ value, label }) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
               </select>
             </div>
             {showRunKind ? (
