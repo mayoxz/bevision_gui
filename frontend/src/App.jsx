@@ -35,6 +35,7 @@ export default function App() {
                   setRunKind((runKindOptions[next] ?? [])[0]?.value ?? 'eval')
                 }}
               >
+                <option value="epoch-logs">Epoch logs</option>
                 <option value="nus-mini">NuScenes-mini</option>
                 <option value="nuscenes">NuScenes (full)</option>
               </select>

@@ -342,6 +342,28 @@ body {
   font-weight: 600;
 }
 
+.eval-dash__th-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.eval-dash__th-sort:hover {
+  color: var(--accent);
+}
+
+.eval-dash__sort-icon {
+  flex-shrink: 0;
+}
+
 .eval-dash__table tbody tr:last-child td {
   border-bottom: none;
 }
