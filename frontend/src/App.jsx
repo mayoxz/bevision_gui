@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { SpaViewport } from './viz/SpaViewport.jsx'
 
 const DATASET_OPTIONS = [
-  { value: 'epoch-logs', label: 'Epoch logs' },
+  { value: 'epoch-logs', label: 'Epoch logs(waymo)' },
   { value: 'nus-mini', label: 'NuScenes-mini' },
   { value: 'nuscenes', label: 'NuScenes (full)' },
 ]

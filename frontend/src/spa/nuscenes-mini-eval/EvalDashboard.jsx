@@ -19,7 +19,7 @@ const CLASSES = [
   'traffic_cone',
 ]
 
-const DIST_THRESHOLDS = [0.5, 1.0, 2.0, 4.0]
+const DIST_THRESHOLDS = ['0.5', '1.0', '2.0', '4.0']
 
 const ERROR_KEYS = [
   { key: 'trans_err', label: 'Trans' },

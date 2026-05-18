@@ -29,19 +29,20 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
+    --text: #c7c7c7;
+    --text-h: #f4f4f4;
+    --bg: #252525;
+    --border: #474747;
+    --code-bg: #333333;
+    --accent: #dddddd;
+    --accent-bg: rgba(221, 221, 221, 0.12);
+    --accent-border: rgba(221, 221, 221, 0.42);
   }
 }
 
 body {
   margin: 0;
+  background: var(--bg);
 }
 
 #root {
@@ -286,6 +287,45 @@ body {
   margin: 0 0 12px;
 }
 
+.eval-dash__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.eval-dash__section-head .eval-dash__h2 {
+  margin-bottom: 0;
+}
+
+.eval-dash__export-btn {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-h);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.eval-dash__export-btn:hover:not(:disabled) {
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.eval-dash__export-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.eval-dash__export-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .eval-dash__metric-row {
   display: flex;
   flex-wrap: wrap;
@@ -380,7 +420,7 @@ body {
 
 @media (prefers-color-scheme: dark) {
   .eval-dash__mean-row td {
-    background: rgba(192, 132, 252, 0.08);
+    background: rgba(221, 221, 221, 0.08);
   }
 }
 
