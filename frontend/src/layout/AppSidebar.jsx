@@ -27,6 +27,29 @@ function ResetZoomIcon() {
   )
 }
 
+function TrashIcon() {
+  return (
+    <svg
+      className="app-sidebar__icon-svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+    </svg>
+  )
+}
+
 function blurAfterClick(handler) {
   return (event) => {
     handler(event)
@@ -51,8 +74,8 @@ function PointcloudControls({ controls }) {
     onResetPosition,
     onSavePng,
     openFilePicker,
+    onClearFiles,
     canResetView,
-    status,
   } = controls
 
   return (
@@ -67,15 +90,29 @@ function PointcloudControls({ controls }) {
         accept=".bin,.pcd,.pcd.bin,application/octet-stream"
         onChange={onFileChange}
       />
-      <button type="button" className="app-sidebar__btn" onClick={blurAfterClick(openFilePicker)}>
-        Choose files
-      </button>
+      <div className="app-sidebar__file-row">
+        <button type="button" className="app-sidebar__btn" onClick={blurAfterClick(openFilePicker)}>
+          Choose files
+        </button>
+        <button
+          type="button"
+          className="app-sidebar__icon-btn app-sidebar__icon-btn--danger"
+          onClick={blurAfterClick(onClearFiles)}
+          disabled={!canResetView}
+          title={canResetView ? '불러온 파일 비우기' : '비울 파일이 없습니다'}
+          aria-label="Clear loaded files"
+        >
+          <TrashIcon />
+        </button>
+      </div>
 
-      <label className="app-sidebar__field" htmlFor="pc-color-mode">
-        <span className="app-sidebar__label">Color</span>
+      <div className="app-sidebar__inline-field">
+        <label className="app-sidebar__label" htmlFor="pc-color-mode">
+          Color
+        </label>
         <select
           id="pc-color-mode"
-          className="app-sidebar__select"
+          className="app-sidebar__select app-sidebar__inline-control"
           value={colorMode}
           onChange={onColorModeChange}
         >
@@ -83,11 +120,13 @@ function PointcloudControls({ controls }) {
           <option value="intensity">Intensity</option>
           <option value="distance">Distance</option>
         </select>
-      </label>
+      </div>
 
-      <label className="app-sidebar__field" htmlFor="pc-point-size">
-        <span className="app-sidebar__label">Point size</span>
-        <div className="app-sidebar__range-row">
+      <div className="app-sidebar__inline-field">
+        <label className="app-sidebar__label" htmlFor="pc-point-size">
+          Point size
+        </label>
+        <div className="app-sidebar__range-row app-sidebar__inline-control">
           <input
             id="pc-point-size"
             className="app-sidebar__range"
@@ -102,11 +141,11 @@ function PointcloudControls({ controls }) {
             {pointSize}
           </output>
         </div>
-      </label>
+      </div>
 
-      <div className="app-sidebar__meta">
+      <div className="app-sidebar__inline-field">
         <span className="app-sidebar__label">Zoom</span>
-        <div className="app-sidebar__zoom-row">
+        <div className="app-sidebar__zoom-row app-sidebar__inline-control">
           <output className="app-sidebar__output">{zoomLabel}</output>
           <button
             type="button"
@@ -149,8 +188,6 @@ function PointcloudControls({ controls }) {
           Save PNG
         </button>
       </div>
-
-      <p className="app-sidebar__status">{status}</p>
     </section>
   )
 }
@@ -158,6 +195,7 @@ function PointcloudControls({ controls }) {
 export default function AppSidebar({ activeView, onViewChange, pointcloudControls }) {
   const dashboardItems = NAV_ITEMS.filter((item) => item.section === 'dashboard')
   const toolItems = NAV_ITEMS.filter((item) => item.section === 'tools')
+  const externalItems = NAV_ITEMS.filter((item) => item.section === 'external')
 
   return (
     <aside className="app-sidebar" aria-label="Navigation">
@@ -193,6 +231,26 @@ export default function AppSidebar({ activeView, onViewChange, pointcloudControl
             </li>
           ))}
         </ul>
+
+        {externalItems.length > 0 ? (
+          <>
+            <p className="app-sidebar__heading">Links</p>
+            <ul className="app-sidebar__list">
+              {externalItems.map(({ id, label, href }) => (
+                <li key={id}>
+                  <a
+                    className="app-sidebar__link app-sidebar__link--external"
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
       </nav>
 
       {activeView === 'pointcloud' ? <PointcloudControls controls={pointcloudControls} /> : null}

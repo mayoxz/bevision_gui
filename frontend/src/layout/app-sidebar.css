@@ -73,7 +73,7 @@
   display: block;
   width: 100%;
   margin: 0;
-  padding: 8px 10px;
+  padding: 6px 10px;
   border: none;
   border-radius: var(--sb-radius);
   background: transparent;
@@ -83,6 +83,15 @@
   font-weight: 400;
   text-align: left;
   cursor: pointer;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.app-sidebar__link--external::after {
+  content: '↗';
+  margin-left: 4px;
+  font-size: 11px;
+  color: var(--sb-text);
 }
 
 .app-sidebar__link:hover {
@@ -106,10 +115,70 @@
   border: 0;
 }
 
+.app-sidebar__file-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.app-sidebar__file-row .app-sidebar__btn {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-sidebar__icon-btn--danger {
+  color: #e5484d;
+  border-color: color-mix(in srgb, #e5484d 40%, var(--sb-border));
+}
+
+.app-sidebar__icon-btn--danger:hover:not(:disabled) {
+  border-color: color-mix(in srgb, #e5484d 65%, var(--sb-border));
+  background: color-mix(in srgb, #e5484d 10%, var(--code-bg));
+}
+
+.app-sidebar__icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .app-sidebar__field {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.app-sidebar__inline-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.app-sidebar__inline-field > .app-sidebar__label {
+  flex-shrink: 0;
+  width: 62px;
+}
+
+.app-sidebar__inline-control {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.app-sidebar__inline-field .app-sidebar__range-row,
+.app-sidebar__inline-field .app-sidebar__zoom-row {
+  width: 100%;
+  min-width: 0;
+}
+
+.app-sidebar__inline-field .app-sidebar__zoom-row {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.app-sidebar__inline-field .app-sidebar__zoom-row .app-sidebar__output {
+  text-align: left;
+  min-width: 0;
 }
 
 .app-sidebar__label {
@@ -130,12 +199,12 @@
 .app-sidebar__btn {
   font-size: 12px;
   font-weight: 400;
-  padding: 6px 10px;
+  padding: 4px 10px;
 }
 
 .app-sidebar__select {
   font-size: 13px;
-  padding: 6px 10px;
+  padding: 4px 10px;
 }
 
 .app-sidebar__icon-btn {
@@ -178,8 +247,17 @@
 }
 
 .app-sidebar__range {
-  flex: 1;
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+  max-width: 100%;
   accent-color: var(--accent);
+}
+
+.app-sidebar__inline-field .app-sidebar__output {
+  flex-shrink: 0;
+  min-width: 1.75em;
+  text-align: right;
 }
 
 .app-sidebar__output {
@@ -217,7 +295,7 @@
 .app-sidebar__mode-btn {
   flex: 1;
   min-width: 0;
-  padding: 6px 4px;
+  padding: 4px 4px;
   font-size: 11px;
   font-weight: 400;
   text-align: center;

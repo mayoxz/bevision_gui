@@ -3,7 +3,14 @@ export const NAV_ITEMS = [
   { id: 'nus-mini:eval', label: 'NuScenes-mini · eval', section: 'dashboard' },
   { id: 'nus-mini:smoke', label: 'NuScenes-mini · smoke', section: 'dashboard' },
   { id: 'nuscenes:eval', label: 'NuScenes · eval', section: 'dashboard' },
-  { id: 'pointcloud', label: 'Point Cloud', section: 'tools' },
+  { id: 'pointcloud', label: 'Point Cloud Viewer', section: 'tools' },
+  { id: 'nuscenes-home', label: 'nuScenes', section: 'external', href: 'https://www.nuscenes.org/' },
+  {
+    id: 'r2-explorer',
+    label: 'R2-Explorer',
+    section: 'external',
+    href: 'https://lidar-ai-r2explorer.mow0qaws.workers.dev/lidar-ai/files',
+  },
 ]
 
 export function parseViewId(viewId) {

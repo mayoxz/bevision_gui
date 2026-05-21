@@ -21,6 +21,8 @@ export default function PointcloudViewer({
   dropHintHidden,
   orientationLabels,
   perfLabel,
+  fileLabel,
+  fileLabelFull,
   canvasRef,
   stageRef,
   frameRef,
@@ -41,6 +43,11 @@ export default function PointcloudViewer({
               <AxisLabel label="Front" position={orientationLabels.front} />
               <AxisLabel label="Back" position={orientationLabels.back} />
             </>
+          ) : null}
+          {fileLabel ? (
+            <div className="pc-viewer__file-label" title={fileLabelFull || fileLabel}>
+              {fileLabel}
+            </div>
           ) : null}
           <div className="pc-viewer__perf" aria-live="polite">
             {perfLabel}

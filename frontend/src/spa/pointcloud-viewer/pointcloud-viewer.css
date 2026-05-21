@@ -1,4 +1,6 @@
 .pc-viewer {
+  --pc-overlay-bg: #3d424d;
+
   flex: 1;
   min-height: 0;
   display: flex;
@@ -57,7 +59,37 @@
   display: none;
 }
 
-/* HTML overlay — excluded from canvas PNG export */
+/* HTML overlay — excluded from canvas PNG export (file label is drawn in savePng) */
+.pc-viewer__file-label {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  max-width: calc(100% - 20px);
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: transparent;
+  color: #e8e8e8;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: auto;
+  user-select: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: default;
+  isolation: isolate;
+}
+
+.pc-viewer__file-label::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--pc-overlay-bg);
+  z-index: -1;
+}
+
 .pc-viewer__perf {
   position: absolute;
   left: 10px;
@@ -65,8 +97,8 @@
   z-index: 2;
   padding: 4px 8px;
   border-radius: 4px;
-  background: rgba(0, 0, 0, 0.72);
-  color: #b8c0cc;
+  background: var(--pc-overlay-bg);
+  color: #e8e8e8;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   pointer-events: none;
@@ -81,7 +113,7 @@
   position: absolute;
   padding: 6px 10px;
   border-radius: 4px;
-  background: rgba(0, 0, 0, 0.72);
+  background: var(--pc-overlay-bg);
   color: #e8e8e8;
   font-size: 12px;
   font-weight: 600;

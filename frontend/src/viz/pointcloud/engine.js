@@ -61,6 +61,42 @@ const COLOR_MODE_INDEX = {
   distance: 2,
 }
 
+const VIEW_MODE_FILENAME_SUFFIX = {
+  perspective: 'persp',
+  ortho: 'ortho',
+  bev: 'bev',
+}
+
+function fileStem(name) {
+  return name.replace(/\.[^.]+$/, '')
+}
+
+function formatLoadedFileNames(fileList) {
+  if (fileList.length === 0) return ''
+  if (fileList.length === 1) return fileList[0].name
+  const others = fileList.length - 1
+  const otherLabel = others === 1 ? '1 other' : `${others} others`
+  return `${fileList[0].name} + ${otherLabel}`
+}
+
+function formatLoadedSourceStem(fileList) {
+  if (fileList.length === 0) return ''
+  if (fileList.length === 1) return fileStem(fileList[0].name)
+  const others = fileList.length - 1
+  return `${fileStem(fileList[0].name)}-and-${others}others`
+}
+
+function sanitizeFilenamePart(value) {
+  const sanitized = value.replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^_+|_+$/g, '')
+  return sanitized || 'pointcloud'
+}
+
+function buildPngDownloadName(sourceStem, mode) {
+  const stem = sanitizeFilenamePart(sourceStem || 'pointcloud')
+  const modeSuffix = VIEW_MODE_FILENAME_SUFFIX[mode] ?? mode
+  return `${stem}-${modeSuffix}.png`
+}
+
 /**
  * @param {HTMLCanvasElement} canvas
  * @param {HTMLElement} stage
@@ -73,6 +109,7 @@ const COLOR_MODE_INDEX = {
  *   onResetAvailable?: (available: boolean) => void,
  *   onOrientationLabels?: (layout: { front: { x: number, y: number }, back: { x: number, y: number } } | null) => void,
  *   onFps?: (fps: number, pointCount: number) => void,
+ *   onFileLabel?: (info: { short: string, full: string }) => void,
  * }} callbacks
  */
 export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
@@ -80,6 +117,36 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
   if (!gl) {
     callbacks.onStatus?.('WebGL is not available in this browser.')
     throw new Error('WebGL unavailable')
+  }
+
+  let loadedFileLabel = ''
+  let loadedFileLabelFull = ''
+  let loadedSourceStem = ''
+
+  function setFileLabel(short, full) {
+    loadedFileLabel = short
+    loadedFileLabelFull = full
+    callbacks.onFileLabel?.({ short, full })
+  }
+
+  function drawTopLeftLabel(ctx, text, width, height) {
+    if (!text) return
+
+    const scale = Math.max(1, height / 720)
+    const margin = Math.round(10 * scale)
+    const padX = Math.round(8 * scale)
+    const padY = Math.round(4 * scale)
+    const fontSize = Math.round(11 * scale)
+    ctx.font = `${fontSize}px ui-monospace, Consolas, monospace`
+    const textWidth = ctx.measureText(text).width
+    const boxWidth = textWidth + padX * 2
+    const boxHeight = fontSize + padY * 2
+
+    ctx.fillStyle = '#3d424d'
+    ctx.fillRect(margin, margin, boxWidth, boxHeight)
+    ctx.fillStyle = '#e8e8e8'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(text, margin + padX, margin + boxHeight / 2)
   }
 
   const cleanups = []
@@ -863,12 +930,45 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
     radius = Math.max(maxX - minX, maxY - minY, maxZ - minZ, 1)
   }
 
+  function clearFiles() {
+    if (!pointCount) return false
+
+    pointCount = 0
+    center = [0, 0, 0]
+    radius = 80
+    viewMode = 'perspective'
+    orbitCamera = null
+    bevCamera = null
+    clearHomes()
+    applyInitialOrbitCamera()
+    pendingPan.dx = 0
+    pendingPan.dy = 0
+    pendingWheelDelta = 0
+    isDragging = false
+    pressedKeys.clear()
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(0), gl.STATIC_DRAW)
+    vertexLayoutReady = false
+
+    setFileLabel('', '')
+    loadedSourceStem = ''
+    callbacks.onDropHintHidden?.(false)
+    callbacks.onViewModeChange?.('perspective')
+    callbacks.onZoom?.(1)
+    callbacks.onFps?.(0, 0)
+    callbacks.onStatus?.('No point cloud loaded.')
+    render()
+    return true
+  }
+
   async function loadFiles(files) {
     try {
       const fileList = Array.from(files)
       if (!fileList.length) return
 
       callbacks.onStatus?.(`Loading ${fileList.length} file(s)...`)
+      setFileLabel('Loading…', `Loading ${fileList.length} file(s)...`)
       const clouds = []
       let totalPoints = 0
       for (const file of fileList) {
@@ -896,10 +996,15 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
       callbacks.onFps?.(0, pointCount)
       render()
       scheduleRender()
-      const names = fileList.length === 1 ? fileList[0].name : `${fileList.length} files`
-      callbacks.onStatus?.(`${names} - ${pointCount.toLocaleString()} points`)
+      const names = formatLoadedFileNames(fileList)
+      loadedSourceStem = formatLoadedSourceStem(fileList)
+      const loadedLabel = `${names} - ${pointCount.toLocaleString()} points`
+      const displayLabel = `${names} · ${pointCount.toLocaleString()} pts`
+      callbacks.onStatus?.(loadedLabel)
+      setFileLabel(displayLabel, loadedLabel)
     } catch (error) {
       callbacks.onStatus?.(error.message)
+      setFileLabel('Error', error.message)
     }
   }
 
@@ -1052,10 +1157,13 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
   callbacks.onResetAvailable?.(false)
   callbacks.onOrientationLabels?.(null)
   callbacks.onStatus?.('No point cloud loaded.')
+  setFileLabel('', '')
+  loadedSourceStem = ''
   render()
 
   return {
     loadFiles,
+    clearFiles,
     setViewMode,
     resetZoom,
     resetPosition,
@@ -1086,9 +1194,10 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
         )
       }
       ctx.putImageData(imageData, 0, 0)
+      drawTopLeftLabel(ctx, loadedFileLabelFull, w, h)
       const link = document.createElement('a')
       link.href = copy.toDataURL('image/png')
-      link.download = `nuscenes-pointcloud-${new Date().toISOString().replace(/[:.]/g, '-')}.png`
+      link.download = buildPngDownloadName(loadedSourceStem, viewMode)
       link.click()
     },
     getViewMode: () => viewMode,

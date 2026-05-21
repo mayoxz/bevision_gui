@@ -26,7 +26,8 @@ export function usePointcloudController(active) {
   const engineRef = useRef(null)
   const fileInputRef = useRef(null)
 
-  const [status, setStatus] = useState('No point cloud loaded.')
+  const [fileLabel, setFileLabel] = useState('')
+  const [fileLabelFull, setFileLabelFull] = useState('')
   const [canResetView, setCanResetView] = useState(false)
   const [viewMode, setViewMode] = useState('perspective')
   const [zoomLabel, setZoomLabel] = useState('1.0x')
@@ -48,11 +49,14 @@ export function usePointcloudController(active) {
     let lastZoomLabel = ''
     let lastOrientationLabels = null
     let lastPerfLabel = ''
-    let loadedPointCount = 0
 
     try {
       engine = createPointcloudEngine(canvas, stage, frame, {
-        onStatus: setStatus,
+        onStatus: () => {},
+        onFileLabel: ({ short, full }) => {
+          setFileLabel(short)
+          setFileLabelFull(full)
+        },
         onZoom: (factor) => {
           const next = `${factor.toFixed(1)}x`
           if (next === lastZoomLabel) return
@@ -68,20 +72,18 @@ export function usePointcloudController(active) {
           setOrientationLabels(lastOrientationLabels)
         },
         onFps: (fps, count) => {
-          if (count > 0) loadedPointCount = count
-          if (loadedPointCount <= 0) return
+          if (count <= 0) {
+            if (lastPerfLabel !== '') {
+              lastPerfLabel = ''
+              setPerfLabel('')
+            }
+            return
+          }
 
-          const displayCount = count > 0 ? count : loadedPointCount
-          const countLabel = displayCount >= 1_000_000
-            ? `${(displayCount / 1_000_000).toFixed(1)}M pts`
-            : displayCount >= 1000
-              ? `${Math.round(displayCount / 1000)}k pts`
-              : `${displayCount} pts`
           const fpsText = fps > 0 ? `${fps} FPS` : '— FPS'
-          const next = `${fpsText} · ${countLabel}`
-          if (next === lastPerfLabel) return
-          lastPerfLabel = next
-          setPerfLabel(next)
+          if (fpsText === lastPerfLabel) return
+          lastPerfLabel = fpsText
+          setPerfLabel(fpsText)
         },
       })
       engineRef.current = engine
@@ -96,7 +98,9 @@ export function usePointcloudController(active) {
       setViewMode('perspective')
       setOrientationLabels(null)
       setPerfLabel('')
-      loadedPointCount = 0
+      setFileLabel('')
+      setFileLabelFull('')
+      lastPerfLabel = ''
     }
   }, [active])
 
@@ -134,6 +138,11 @@ export function usePointcloudController(active) {
     engineRef.current?.savePng()
   }, [])
 
+  const onClearFiles = useCallback(() => {
+    engineRef.current?.clearFiles()
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }, [])
+
   const openFilePicker = useCallback(() => {
     fileInputRef.current?.click()
   }, [])
@@ -147,13 +156,14 @@ export function usePointcloudController(active) {
       viewMode,
       orientationLabels,
       perfLabel,
+      fileLabel,
+      fileLabelFull,
       canvasRef,
       stageRef,
       frameRef,
     },
     controls: {
       fileInputRef,
-      status,
       zoomLabel,
       pointSize,
       colorMode,
@@ -167,6 +177,7 @@ export function usePointcloudController(active) {
       onResetPosition,
       onSavePng,
       openFilePicker,
+      onClearFiles,
     },
   }
 }
