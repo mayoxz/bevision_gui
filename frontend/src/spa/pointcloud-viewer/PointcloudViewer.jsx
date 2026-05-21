@@ -20,6 +20,7 @@ function AxisLabel({ label, position }) {
 export default function PointcloudViewer({
   dropHintHidden,
   orientationLabels,
+  perfLabel,
   canvasRef,
   stageRef,
   frameRef,
@@ -40,6 +41,11 @@ export default function PointcloudViewer({
               <AxisLabel label="Front" position={orientationLabels.front} />
               <AxisLabel label="Back" position={orientationLabels.back} />
             </>
+          ) : null}
+          {perfLabel ? (
+            <div className="pc-viewer__perf" aria-live="polite">
+              {perfLabel}
+            </div>
           ) : null}
           <div className={`pc-viewer__drop${dropHintHidden ? ' pc-viewer__drop--hidden' : ''}`} id="pc-drop-hint">
             Drop nuScenes .pcd.bin or RADAR .pcd files here, or choose them in the sidebar.

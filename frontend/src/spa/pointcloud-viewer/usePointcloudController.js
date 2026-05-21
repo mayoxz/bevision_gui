@@ -34,6 +34,7 @@ export function usePointcloudController(active) {
   const [colorMode, setColorMode] = useState('height')
   const [dropHintHidden, setDropHintHidden] = useState(false)
   const [orientationLabels, setOrientationLabels] = useState(null)
+  const [perfLabel, setPerfLabel] = useState('')
 
   useEffect(() => {
     if (!active) return undefined
@@ -46,6 +47,8 @@ export function usePointcloudController(active) {
     let engine
     let lastZoomLabel = ''
     let lastOrientationLabels = null
+    let lastPerfLabel = ''
+    let fpsIdleTimer = 0
 
     try {
       engine = createPointcloudEngine(canvas, stage, frame, {
@@ -64,6 +67,25 @@ export function usePointcloudController(active) {
           lastOrientationLabels = layout ? cloneOrientationLabels(layout) : null
           setOrientationLabels(lastOrientationLabels)
         },
+        onFps: (fps, count) => {
+          const countLabel = count >= 1_000_000
+            ? `${(count / 1_000_000).toFixed(1)}M pts`
+            : count >= 1000
+              ? `${Math.round(count / 1000)}k pts`
+              : count > 0
+                ? `${count} pts`
+                : ''
+          const next = count > 0 ? `${fps} FPS · ${countLabel}` : ''
+          if (next !== lastPerfLabel) {
+            lastPerfLabel = next
+            setPerfLabel(next)
+          }
+          if (fpsIdleTimer) window.clearTimeout(fpsIdleTimer)
+          fpsIdleTimer = window.setTimeout(() => {
+            lastPerfLabel = ''
+            setPerfLabel('')
+          }, 1500)
+        },
       })
       engineRef.current = engine
     } catch {
@@ -71,11 +93,13 @@ export function usePointcloudController(active) {
     }
 
     return () => {
+      if (fpsIdleTimer) window.clearTimeout(fpsIdleTimer)
       engine.destroy()
       engineRef.current = null
       setCanResetView(false)
       setViewMode('perspective')
       setOrientationLabels(null)
+      setPerfLabel('')
     }
   }, [active])
 
@@ -125,6 +149,7 @@ export function usePointcloudController(active) {
       dropHintHidden,
       viewMode,
       orientationLabels,
+      perfLabel,
       canvasRef,
       stageRef,
       frameRef,

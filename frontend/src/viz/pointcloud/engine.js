@@ -71,10 +71,11 @@ const COLOR_MODE_INDEX = {
  *   onViewModeChange?: (mode: 'perspective' | 'ortho' | 'bev') => void,
  *   onResetAvailable?: (available: boolean) => void,
  *   onOrientationLabels?: (layout: { front: { x: number, y: number }, back: { x: number, y: number } } | null) => void,
+ *   onFps?: (fps: number, pointCount: number) => void,
  * }} callbacks
  */
 export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
-  const gl = canvas.getContext('webgl', { antialias: false, alpha: false, preserveDrawingBuffer: true })
+  const gl = canvas.getContext('webgl', { antialias: false, alpha: false, preserveDrawingBuffer: false })
   if (!gl) {
     callbacks.onStatus?.('WebGL is not available in this browser.')
     throw new Error('WebGL unavailable')
@@ -109,6 +110,8 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
   }
 
   const program = createProgram()
+  gl.enable(gl.DEPTH_TEST)
+  gl.depthFunc(gl.LEQUAL)
   const locations = {
     position: gl.getAttribLocation(program, 'aPosition'),
     intensity: gl.getAttribLocation(program, 'aIntensity'),
@@ -150,13 +153,13 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
   let homeOrbitCamera = null
   /** @type {ReturnType<typeof cameraSnapshot> | null} */
   let homeBevCamera = null
-  const minPitch = -1.35
-  const maxPitch = 1.35
   let colorMode = 'height'
   let pointSizeValue = 2.5
   const pressedKeys = new Set()
   const MAX_RENDER_FPS = 120
   const MIN_RENDER_INTERVAL = 1000 / MAX_RENDER_FPS
+  /** Keyboard step sizes in getCameraStepSizes() are tuned for this frame interval. */
+  const KEYBOARD_REFERENCE_MS = 1000 / 60
   let renderAnimation = 0
   let lastRenderTime = 0
   let resizeAnimation = 0
@@ -166,9 +169,15 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
   const pendingRotate = { dx: 0, dy: 0 }
   const pendingPan = { dx: 0, dy: 0 }
   let pendingWheelDelta = 0
+  const viewProjData = new Float32Array(16)
+  let vertexLayoutReady = false
+  let lastLabelUpdate = 0
+  let cachedLabelLayout = null
+  const LABEL_UPDATE_INTERVAL_MS = 100
+  let fpsFrameCount = 0
+  let fpsSampleStart = 0
 
-  function mat4Multiply(a, b) {
-    const out = new Array(16).fill(0)
+  function mat4MultiplyInto(out, a, b) {
     for (let c = 0; c < 4; c++) {
       for (let r = 0; r < 4; r++) {
         out[c * 4 + r] =
@@ -179,6 +188,27 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
       }
     }
     return out
+  }
+
+  function setupVertexLayout() {
+    if (vertexLayoutReady) return
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
+    gl.enableVertexAttribArray(locations.position)
+    gl.vertexAttribPointer(locations.position, 3, gl.FLOAT, false, 16, 0)
+    gl.enableVertexAttribArray(locations.intensity)
+    gl.vertexAttribPointer(locations.intensity, 1, gl.FLOAT, false, 16, 12)
+    vertexLayoutReady = true
+  }
+
+  function recordRenderFrame(now) {
+    fpsFrameCount++
+    if (!fpsSampleStart) fpsSampleStart = now
+    const elapsed = now - fpsSampleStart
+    if (elapsed < 500) return
+    const fps = Math.round((fpsFrameCount * 1000) / elapsed)
+    fpsFrameCount = 0
+    fpsSampleStart = now
+    callbacks.onFps?.(fps, pointCount)
   }
 
   function perspective(fovY, aspect, near, far) {
@@ -344,6 +374,8 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
     bevCamera = null
     homeOrbitCamera = null
     homeBevCamera = null
+    cachedLabelLayout = null
+    lastLabelUpdate = 0
     callbacks.onResetAvailable?.(false)
     callbacks.onOrientationLabels?.(null)
   }
@@ -368,6 +400,8 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
     }
 
     viewMode = mode
+    cachedLabelLayout = null
+    lastLabelUpdate = 0
     callbacks.onViewModeChange?.(viewMode)
     render()
     return true
@@ -407,29 +441,17 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
     return { direction, right, up }
   }
 
-  function currentTarget() {
+  function navigationOffset() {
     return [
-      center[0] + panOffset[0] + keyboardOffset[0],
-      center[1] + panOffset[1] + keyboardOffset[1],
-      center[2] + panOffset[2] + keyboardOffset[2],
+      panOffset[0] + keyboardOffset[0],
+      panOffset[1] + keyboardOffset[1],
+      panOffset[2] + keyboardOffset[2],
     ]
   }
 
-  function setTarget(target) {
-    panOffset = [
-      target[0] - center[0] - keyboardOffset[0],
-      target[1] - center[1] - keyboardOffset[1],
-      target[2] - center[2] - keyboardOffset[2],
-    ]
-  }
-
-  function clampPitch(value) {
-    return Math.max(minPitch, Math.min(maxPitch, value))
-  }
-
-  function clampVerticalOffset(value) {
-    const limit = Math.max(10, radius * 0.5)
-    return Math.max(-limit, Math.min(limit, value))
+  function currentTarget() {
+    const o = navigationOffset()
+    return [center[0] + o[0], center[1] + o[1], center[2] + o[2]]
   }
 
   function visibleHalfHeight() {
@@ -467,21 +489,6 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
     distance = Math.max(2, Math.min(1000, distance + amount))
   }
 
-  function rotateCameraInPlace(updateRotation) {
-    const eye = [
-      currentTarget()[0] + cameraVectors().direction[0] * distance,
-      currentTarget()[1] + cameraVectors().direction[1] * distance,
-      currentTarget()[2] + cameraVectors().direction[2] * distance,
-    ]
-    updateRotation()
-    const { direction } = cameraVectors()
-    setTarget([
-      eye[0] - direction[0] * distance,
-      eye[1] - direction[1] * distance,
-      eye[2] - direction[2] * distance,
-    ])
-  }
-
   function hasPendingCameraInput() {
     return pendingRotate.dx !== 0
       || pendingRotate.dy !== 0
@@ -514,10 +521,8 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
   function applyPendingRotateDrag(dx, dy) {
     if (!dx && !dy) return
     const rotateScale = pointerRotateScale()
-    rotateCameraInPlace(() => {
-      yaw += dx * rotateScale
-      pitch = clampPitch(pitch + dy * rotateScale)
-    })
+    yaw += dx * rotateScale
+    pitch += dy * rotateScale
   }
 
   function applyPendingWheelDelta() {
@@ -539,11 +544,11 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
       pendingRotate.dy = 0
     }
     applyPendingWheelDelta()
-    if (pressedKeys.size) moveCameraFromKeysStep()
   }
 
-  function render() {
+  function render(now = performance.now()) {
     if (!resizeCanvas()) return
+    recordRenderFrame(now)
 
     if (pointCount > 0) {
       const zoomFactor = resetDistance / Math.max(distance, 0.001)
@@ -577,41 +582,46 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
       ]
       view = lookAt(eye, target, pickLookAtUp(direction))
     }
-    const viewProjection = mat4Multiply(projection, view)
+    mat4MultiplyInto(viewProjData, projection, view)
 
     gl.useProgram(program)
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
-    gl.enableVertexAttribArray(locations.position)
-    gl.vertexAttribPointer(locations.position, 3, gl.FLOAT, false, 16, 0)
-    gl.enableVertexAttribArray(locations.intensity)
-    gl.vertexAttribPointer(locations.intensity, 1, gl.FLOAT, false, 16, 12)
-    gl.uniformMatrix4fv(locations.viewProjection, false, new Float32Array(viewProjection))
+    setupVertexLayout()
+    gl.uniformMatrix4fv(locations.viewProjection, false, viewProjData)
     gl.uniform1f(locations.pointSize, pointSizeValue)
     gl.uniform1i(locations.colorMode, COLOR_MODE_INDEX[colorMode] ?? 0)
     gl.drawArrays(gl.POINTS, 0, pointCount)
 
-    const labelLayout = computeFrontBackLabelLayout(
-      viewProjection,
-      currentTarget(),
-      radius,
-      canvas.clientWidth,
-      canvas.clientHeight,
-    )
-    callbacks.onOrientationLabels?.(labelLayout)
+    if (now - lastLabelUpdate >= LABEL_UPDATE_INTERVAL_MS || !cachedLabelLayout) {
+      lastLabelUpdate = now
+      cachedLabelLayout = computeFrontBackLabelLayout(
+        viewProjData,
+        currentTarget(),
+        radius,
+        canvas.clientWidth,
+        canvas.clientHeight,
+      )
+      callbacks.onOrientationLabels?.(cachedLabelLayout)
+    }
   }
 
   function renderLoop(now) {
     renderAnimation = 0
     if (!hasPendingCameraInput()) return
 
-    const elapsed = now - lastRenderTime
-    if (lastRenderTime > 0 && elapsed < MIN_RENDER_INTERVAL) {
-      scheduleRender()
-      return
+    let elapsedMs = KEYBOARD_REFERENCE_MS
+    if (lastRenderTime > 0) {
+      elapsedMs = Math.min(now - lastRenderTime, 100)
+      if (elapsedMs < MIN_RENDER_INTERVAL) {
+        scheduleRender()
+        return
+      }
     }
 
     applyPendingCameraInput()
-    render()
+    if (pressedKeys.size) {
+      moveCameraFromKeysStep(elapsedMs / KEYBOARD_REFERENCE_MS)
+    }
+    render(now)
     lastRenderTime = now
 
     if (hasPendingCameraInput()) scheduleRender()
@@ -767,6 +777,8 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
       pointCount = totalPoints
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
       gl.bufferData(gl.ARRAY_BUFFER, combined, gl.STATIC_DRAW)
+      vertexLayoutReady = false
+      setupVertexLayout()
       callbacks.onDropHintHidden?.(true)
       captureHomesOnLoad()
       render()
@@ -791,46 +803,42 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
     panOffset[2] += dz
   }
 
-  function moveCameraFromKeysStep() {
+  function moveCameraFromKeysStep(frameScale) {
     if (!pressedKeys.size) return
 
     const bev = isBevMode()
     const { pan, vertical, dolly, rotate } = getCameraStepSizes()
+    const panStep = pan * frameScale
+    const verticalStep = vertical * frameScale
+    const dollyStep = dolly * frameScale
+    const rotateStep = rotate * frameScale
     const panAxes = bev ? getBevPanAxes() : null
     const orbitRight = bev ? null : cameraVectors().right
     const groundRight = bev
       ? normalize([panAxes.right[0], panAxes.right[1], 0])
       : normalize([orbitRight[0], orbitRight[1], 0])
 
-    if (pressedKeys.has('w')) dollyCamera(-dolly)
-    if (pressedKeys.has('s')) dollyCamera(dolly)
+    if (pressedKeys.has('w')) dollyCamera(-dollyStep)
+    if (pressedKeys.has('s')) dollyCamera(dollyStep)
     if (pressedKeys.has('a')) {
-      keyboardOffset[0] += groundRight[0] * pan
-      keyboardOffset[1] += groundRight[1] * pan
+      keyboardOffset[0] += groundRight[0] * panStep
+      keyboardOffset[1] += groundRight[1] * panStep
     }
     if (pressedKeys.has('d')) {
-      keyboardOffset[0] -= groundRight[0] * pan
-      keyboardOffset[1] -= groundRight[1] * pan
+      keyboardOffset[0] -= groundRight[0] * panStep
+      keyboardOffset[1] -= groundRight[1] * panStep
     }
     if (pressedKeys.has('q')) {
-      keyboardOffset[2] = clampVerticalOffset(keyboardOffset[2] + vertical)
+      keyboardOffset[2] += verticalStep
     }
     if (pressedKeys.has('e')) {
-      keyboardOffset[2] = clampVerticalOffset(keyboardOffset[2] - vertical)
+      keyboardOffset[2] -= verticalStep
     }
     if (!bev) {
-      if (pressedKeys.has('arrowleft')) {
-        rotateCameraInPlace(() => { yaw -= rotate })
-      }
-      if (pressedKeys.has('arrowright')) {
-        rotateCameraInPlace(() => { yaw += rotate })
-      }
-      if (pressedKeys.has('arrowup')) {
-        rotateCameraInPlace(() => { pitch = clampPitch(pitch - rotate) })
-      }
-      if (pressedKeys.has('arrowdown')) {
-        rotateCameraInPlace(() => { pitch = clampPitch(pitch + rotate) })
-      }
+      if (pressedKeys.has('arrowleft')) yaw -= rotateStep
+      if (pressedKeys.has('arrowright')) yaw += rotateStep
+      if (pressedKeys.has('arrowup')) pitch -= rotateStep
+      if (pressedKeys.has('arrowdown')) pitch += rotateStep
     }
   }
 
@@ -946,8 +954,25 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
     },
     savePng() {
       render()
+      const w = canvas.width
+      const h = canvas.height
+      const pixels = new Uint8Array(w * h * 4)
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
+      const copy = document.createElement('canvas')
+      copy.width = w
+      copy.height = h
+      const ctx = copy.getContext('2d')
+      const imageData = ctx.createImageData(w, h)
+      const rowBytes = w * 4
+      for (let y = 0; y < h; y++) {
+        imageData.data.set(
+          pixels.subarray((h - 1 - y) * rowBytes, (h - y) * rowBytes),
+          y * rowBytes,
+        )
+      }
+      ctx.putImageData(imageData, 0, 0)
       const link = document.createElement('a')
-      link.href = canvas.toDataURL('image/png')
+      link.href = copy.toDataURL('image/png')
       link.download = `nuscenes-pointcloud-${new Date().toISOString().replace(/[:.]/g, '-')}.png`
       link.click()
     },

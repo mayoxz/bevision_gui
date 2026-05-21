@@ -58,6 +58,21 @@
 }
 
 /* HTML overlay — excluded from canvas PNG export */
+.pc-viewer__perf {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 2;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #b8c0cc;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  user-select: none;
+}
+
 .pc-viewer__axis-label {
   position: absolute;
   padding: 6px 10px;
