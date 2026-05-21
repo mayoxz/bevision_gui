@@ -12,12 +12,26 @@ export const BEV_CONFIG = {
   zoomFactor: 1.5,
   zoomMin: 0.5,
   zoomMax: 3,
-  /** Slower than orbit wheel (0.001) */
-  wheelSensitivity: 0.00035,
   fitMargin: 1.15,
   minHalfExtent: 20,
-  /** Camera +X axis in world coords → screen right = world −X → +X forward on screen left */
+  /** Camera +X axis in world coords → screen right = world −Y → +X forward on screen left */
   cameraRight: [0, -1, 0],
+}
+
+/** Default perspective orbit pitch (radians above horizontal). */
+export const ORBIT_DEFAULT_PITCH = 0.92
+
+/**
+ * Default orbit basis aligned with BEV heading (+X front on screen left).
+ * Camera sits on −X, +Z from the target so the +X (forward) side faces the viewer.
+ * @returns {{ direction: number[], right: number[], up: number[] }}
+ */
+export function createDefaultOrbitBasis(config = BEV_CONFIG) {
+  const cp = Math.cos(ORBIT_DEFAULT_PITCH)
+  const sp = Math.sin(ORBIT_DEFAULT_PITCH)
+  const direction = normalize([-cp, 0, sp])
+  const right = normalize([...config.cameraRight])
+  return { direction, right, up: normalize(cross(direction, right)) }
 }
 
 export function bevZoomFactor(resetDistance, distance) {

@@ -73,6 +73,10 @@
   user-select: none;
 }
 
+.pc-viewer__perf:empty {
+  display: none;
+}
+
 .pc-viewer__axis-label {
   position: absolute;
   padding: 6px 10px;

@@ -48,6 +48,7 @@ import {
   BEV_CONFIG,
   clampBevDistance,
   createBevCameraSnapshot,
+  createDefaultOrbitBasis,
   getBevEyeAndTarget,
   getBevPanAxes,
   lookAtBev,
@@ -121,12 +122,11 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
   }
 
   const cameraFov = Math.PI / 4
-  const DEFAULT_YAW = -0.65
-  const DEFAULT_PITCH = 0.92
+  /** Elevation limits for orbit (Z-up spherical coords). */
+  const PITCH_LIMIT = Math.PI / 2 - 0.05
   const CAMERA_SPEED = {
     move: 0.008,
     pan: 3,
-    vertical: 1.5,
     dolly: 3,
     rotate: 0.01,
     panDrag: 0.3,
@@ -137,8 +137,13 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
   let pointCount = 0
   let center = [0, 0, 0]
   let radius = 80
-  let yaw = DEFAULT_YAW
-  let pitch = DEFAULT_PITCH
+  /** Orbit camera basis (target → eye); updated incrementally to avoid cross-product flips. */
+  let orbitDirection = [0, 0, 0]
+  let orbitRight = [1, 0, 0]
+  let orbitUp = [0, 1, 0]
+  /** BEV mode still stores yaw/pitch in snapshots. */
+  let yaw = 0
+  let pitch = 0
   let distance = 115
   let resetDistance = 115
   let panOffset = [0, 0, 0]
@@ -166,7 +171,6 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
   let isDragging = false
   let dragButton = 0
   let lastPointer = [0, 0]
-  const pendingRotate = { dx: 0, dy: 0 }
   const pendingPan = { dx: 0, dy: 0 }
   let pendingWheelDelta = 0
   const viewProjData = new Float32Array(16)
@@ -255,15 +259,122 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
     return [v[0] / len, v[1] / len, v[2] / len]
   }
 
-  function orbitReferenceUp() {
-    return normalize([-Math.sin(yaw), Math.cos(yaw), 0])
+  function rotateAroundAxis(v, axis, angle) {
+    const [kx, ky, kz] = normalize(axis)
+    const c = Math.cos(angle)
+    const s = Math.sin(angle)
+    const t = 1 - c
+    const [x, y, z] = v
+    return [
+      (t * kx * kx + c) * x + (t * kx * ky - s * kz) * y + (t * kx * kz + s * ky) * z,
+      (t * kx * ky + s * kz) * x + (t * ky * ky + c) * y + (t * ky * kz - s * kx) * z,
+      (t * kx * kz - s * ky) * x + (t * ky * kz + s * kx) * y + (t * kz * kz + c) * z,
+    ]
   }
 
-  function pickLookAtUp(direction) {
-    if (Math.abs(direction[2]) < 0.85) {
-      return [0, 0, 1]
+  function directionFromYawPitch(y, p) {
+    const cp = Math.cos(p)
+    return normalize([
+      Math.sin(y) * cp,
+      Math.cos(y) * cp,
+      Math.sin(p),
+    ])
+  }
+
+  function setOrbitBasis(direction, right) {
+    orbitDirection = normalize(direction)
+    orbitRight = normalize(right)
+    orbitUp = normalize(cross(orbitDirection, orbitRight))
+  }
+
+  function orbitRightFromYaw(y) {
+    return normalize([Math.cos(y), -Math.sin(y), 0])
+  }
+
+  function orbitRightHintFromDirection() {
+    return normalize([...BEV_CONFIG.cameraRight])
+  }
+
+  function applyDefaultOrbitBasis() {
+    const { direction, right } = createDefaultOrbitBasis()
+    setOrbitBasis(direction, right)
+  }
+
+  function initOrbitBasisFromYawPitch(y, p) {
+    setOrbitBasis(directionFromYawPitch(y, p), orbitRightFromYaw(y))
+  }
+
+  function initOrbitBasisFromSnapshot(direction, savedRight) {
+    setOrbitBasis(direction, savedRight ?? orbitRightHintFromDirection())
+  }
+
+  applyDefaultOrbitBasis()
+
+  function projectOrbitBasis() {
+    orbitDirection = normalize(orbitDirection)
+    let r = orbitRight
+    r = [
+      r[0] - orbitDirection[0] * dot(r, orbitDirection),
+      r[1] - orbitDirection[1] * dot(r, orbitDirection),
+      r[2] - orbitDirection[2] * dot(r, orbitDirection),
+    ]
+    const rl = Math.hypot(r[0], r[1], r[2])
+    if (rl > 1e-6) {
+      r = [r[0] / rl, r[1] / rl, r[2] / rl]
+      if (dot(r, orbitRight) < 0) {
+        r = [-r[0], -r[1], -r[2]]
+      }
+      orbitRight = r
     }
-    return orbitReferenceUp()
+    orbitUp = normalize(cross(orbitDirection, orbitRight))
+  }
+
+  function orbitBasis() {
+    return { direction: orbitDirection, right: orbitRight, up: orbitUp }
+  }
+
+  function clampOrbitDirection(direction) {
+    const d = normalize(direction)
+    const sinLimit = Math.sin(PITCH_LIMIT)
+    const z = d[2]
+    if (z <= sinLimit && z >= -sinLimit) return d
+
+    const clampedZ = Math.max(-sinLimit, Math.min(sinLimit, z))
+    const h = Math.hypot(d[0], d[1])
+    if (h < 1e-8) {
+      return normalize([0, 0, clampedZ])
+    }
+    const scale = Math.sqrt(1 - clampedZ * clampedZ) / h
+    return normalize([d[0] * scale, d[1] * scale, clampedZ])
+  }
+
+  function applyOrbitRotation(azimuthDelta, elevationDelta) {
+    if (!azimuthDelta && !elevationDelta) return
+
+    if (azimuthDelta) {
+      orbitDirection = normalize(rotateAroundAxis(orbitDirection, orbitUp, -azimuthDelta))
+      orbitRight = normalize(rotateAroundAxis(orbitRight, orbitUp, -azimuthDelta))
+    }
+
+    if (elevationDelta) {
+      orbitDirection = normalize(rotateAroundAxis(orbitDirection, orbitRight, -elevationDelta))
+      orbitUp = normalize(rotateAroundAxis(orbitUp, orbitRight, -elevationDelta))
+    }
+
+    const clamped = clampOrbitDirection(orbitDirection)
+    if (Math.abs(clamped[0] - orbitDirection[0]) > 1e-6
+      || Math.abs(clamped[1] - orbitDirection[1]) > 1e-6
+      || Math.abs(clamped[2] - orbitDirection[2]) > 1e-6) {
+      orbitDirection = clamped
+      projectOrbitBasis()
+    } else {
+      orbitDirection = clamped
+      orbitUp = normalize(cross(orbitDirection, orbitRight))
+    }
+  }
+
+  function orbitViewMatrix(eye, basis) {
+    return viewMatrixFromBasis(basis.right, basis.up, basis.direction, eye)
   }
 
   function viewMatrixFromBasis(x, y, z, eye) {
@@ -273,17 +384,6 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
       x[2], y[2], z[2], 0,
       -dot(x, eye), -dot(y, eye), -dot(z, eye), 1,
     ]
-  }
-
-  function lookAt(eye, target, up) {
-    const z = normalize(subtract(eye, target))
-    let x = cross(up, z)
-    if (Math.hypot(x[0], x[1], x[2]) < 1e-6) {
-      x = cross(pickLookAtUp(z), z)
-    }
-    x = normalize(x)
-    const y = cross(z, x)
-    return viewMatrixFromBasis(x, y, z, eye)
   }
 
   function resizeCanvas() {
@@ -303,19 +403,26 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
   }
 
   function cameraSnapshot() {
-    return {
-      yaw,
-      pitch,
+    const base = {
       resetDistance,
       distance,
       panOffset: [...panOffset],
       keyboardOffset: [...keyboardOffset],
     }
+    if (isBevMode()) {
+      return { ...base, yaw, pitch }
+    }
+    return { ...base, direction: [...orbitDirection], right: [...orbitRight] }
   }
 
   function applySnapshot(snapshot) {
-    yaw = snapshot.yaw
-    pitch = snapshot.pitch
+    if (snapshot.direction) {
+      initOrbitBasisFromSnapshot(snapshot.direction, snapshot.right)
+    } else {
+      initOrbitBasisFromYawPitch(snapshot.yaw, snapshot.pitch)
+    }
+    yaw = snapshot.yaw ?? 0
+    pitch = snapshot.pitch ?? 0
     resetDistance = snapshot.resetDistance
     distance = snapshot.distance
     panOffset = [...snapshot.panOffset]
@@ -323,19 +430,24 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
   }
 
   function cloneSnapshot(snapshot) {
-    return {
-      yaw: snapshot.yaw,
-      pitch: snapshot.pitch,
+    const cloned = {
       resetDistance: snapshot.resetDistance,
       distance: snapshot.distance,
       panOffset: [...snapshot.panOffset],
       keyboardOffset: [...snapshot.keyboardOffset],
     }
+    if (snapshot.direction) {
+      cloned.direction = [...snapshot.direction]
+      if (snapshot.right) cloned.right = [...snapshot.right]
+    } else {
+      cloned.yaw = snapshot.yaw
+      cloned.pitch = snapshot.pitch
+    }
+    return cloned
   }
 
   function applyInitialOrbitCamera() {
-    yaw = DEFAULT_YAW
-    pitch = DEFAULT_PITCH
+    applyDefaultOrbitBasis()
     resetDistance = Math.max(40, radius * 1.7)
     distance = resetDistance / 2
     panOffset = [0, 0, 0]
@@ -420,25 +532,18 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
   function resetPosition() {
     const home = isBevMode() ? homeBevCamera : homeOrbitCamera
     if (!home) return false
-    yaw = home.yaw
-    pitch = home.pitch
+    if (home.direction) {
+      initOrbitBasisFromSnapshot(home.direction, home.right)
+    } else {
+      initOrbitBasisFromYawPitch(home.yaw, home.pitch)
+    }
+    yaw = home.yaw ?? 0
+    pitch = home.pitch ?? 0
     panOffset = [...home.panOffset]
     keyboardOffset = [...home.keyboardOffset]
     saveActiveModeState()
     render()
     return true
-  }
-
-  function cameraVectors() {
-    const cp = Math.cos(pitch)
-    const direction = [
-      Math.sin(yaw) * cp,
-      Math.cos(yaw) * cp,
-      Math.sin(pitch),
-    ]
-    const right = normalize([Math.cos(yaw), -Math.sin(yaw), 0])
-    const up = normalize(cross(right, direction))
-    return { direction, right, up }
   }
 
   function navigationOffset() {
@@ -466,7 +571,6 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
     const step = Math.max(0.01, visibleHalfHeight() * CAMERA_SPEED.move)
     return {
       pan: step * CAMERA_SPEED.pan,
-      vertical: step * CAMERA_SPEED.vertical,
       dolly: step * CAMERA_SPEED.dolly,
       rotate: CAMERA_SPEED.rotate,
     }
@@ -490,27 +594,41 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
   }
 
   function hasPendingCameraInput() {
-    return pendingRotate.dx !== 0
-      || pendingRotate.dy !== 0
-      || pendingPan.dx !== 0
+    return pendingPan.dx !== 0
       || pendingPan.dy !== 0
       || pendingWheelDelta !== 0
       || pressedKeys.size > 0
   }
 
+  function getPanAxes() {
+    if (isBevMode()) {
+      return getBevPanAxes()
+    }
+    const { direction, right } = orbitBasis()
+    const lookGround = [-direction[0], -direction[1], 0]
+    const lookLen = Math.hypot(lookGround[0], lookGround[1])
+    const bevAxes = getBevPanAxes()
+    let forward
+    if (lookLen > 1e-6) {
+      forward = [lookGround[0] / lookLen, lookGround[1] / lookLen, 0]
+    } else {
+      forward = [...bevAxes.up]
+    }
+    const rightGround = [right[0], right[1], 0]
+    const rightLen = Math.hypot(rightGround[0], rightGround[1])
+    let groundRight
+    if (rightLen > 1e-6) {
+      groundRight = [rightGround[0] / rightLen, rightGround[1] / rightLen, 0]
+    } else {
+      groundRight = [...bevAxes.right]
+    }
+    return { right: groundRight, up: forward }
+  }
+
   function applyPendingPanDrag(dx, dy) {
     if (!dx && !dy) return
     const scale = panDragScale()
-    if (isBevMode()) {
-      const { right, up } = getBevPanAxes()
-      applyPanDelta(
-        (-right[0] * dx + up[0] * dy) * scale,
-        (-right[1] * dx + up[1] * dy) * scale,
-        (-right[2] * dx + up[2] * dy) * scale,
-      )
-      return
-    }
-    const { right, up } = cameraVectors()
+    const { right, up } = getPanAxes()
     applyPanDelta(
       (-right[0] * dx + up[0] * dy) * scale,
       (-right[1] * dx + up[1] * dy) * scale,
@@ -518,16 +636,14 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
     )
   }
 
-  function applyPendingRotateDrag(dx, dy) {
+  function applyPointerRotateDrag(dx, dy) {
     if (!dx && !dy) return
-    const rotateScale = pointerRotateScale()
-    yaw += dx * rotateScale
-    pitch += dy * rotateScale
+    applyOrbitRotation(dx * pointerRotateScale(), dy * pointerRotateScale())
   }
 
   function applyPendingWheelDelta() {
     if (!pendingWheelDelta || !pointCount) return
-    const wheelK = isBevMode() ? BEV_CONFIG.wheelSensitivity : CAMERA_SPEED.wheel
+    const wheelK = CAMERA_SPEED.wheel
     dollyCamera(distance * (Math.exp(pendingWheelDelta * wheelK) - 1))
     pendingWheelDelta = 0
   }
@@ -537,11 +653,6 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
       applyPendingPanDrag(pendingPan.dx, pendingPan.dy)
       pendingPan.dx = 0
       pendingPan.dy = 0
-    }
-    if (pendingRotate.dx || pendingRotate.dy) {
-      applyPendingRotateDrag(pendingRotate.dx, pendingRotate.dy)
-      pendingRotate.dx = 0
-      pendingRotate.dy = 0
     }
     applyPendingWheelDelta()
   }
@@ -573,14 +684,14 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
       const { eye, target: bevTarget } = getBevEyeAndTarget(target, distance)
       view = lookAtBev(eye, bevTarget, bevMath)
     } else {
-      const { direction } = cameraVectors()
+      const basis = orbitBasis()
       const target = currentTarget()
       const eye = [
-        target[0] + direction[0] * distance,
-        target[1] + direction[1] * distance,
-        target[2] + direction[2] * distance,
+        target[0] + basis.direction[0] * distance,
+        target[1] + basis.direction[1] * distance,
+        target[2] + basis.direction[2] * distance,
       ]
-      view = lookAt(eye, target, pickLookAtUp(direction))
+      view = orbitViewMatrix(eye, basis)
     }
     mat4MultiplyInto(viewProjData, projection, view)
 
@@ -606,7 +717,8 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
 
   function renderLoop(now) {
     renderAnimation = 0
-    if (!hasPendingCameraInput()) return
+    const keepRendering = hasPendingCameraInput() || isDragging || pointCount > 0
+    if (!keepRendering) return
 
     let elapsedMs = KEYBOARD_REFERENCE_MS
     if (lastRenderTime > 0) {
@@ -624,7 +736,7 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
     render(now)
     lastRenderTime = now
 
-    if (hasPendingCameraInput()) scheduleRender()
+    if (keepRendering) scheduleRender()
   }
 
   function scheduleRender() {
@@ -781,7 +893,9 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
       setupVertexLayout()
       callbacks.onDropHintHidden?.(true)
       captureHomesOnLoad()
+      callbacks.onFps?.(0, pointCount)
       render()
+      scheduleRender()
       const names = fileList.length === 1 ? fileList[0].name : `${fileList.length} files`
       callbacks.onStatus?.(`${names} - ${pointCount.toLocaleString()} points`)
     } catch (error) {
@@ -806,39 +920,38 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
   function moveCameraFromKeysStep(frameScale) {
     if (!pressedKeys.size) return
 
-    const bev = isBevMode()
-    const { pan, vertical, dolly, rotate } = getCameraStepSizes()
+    const { pan, dolly, rotate } = getCameraStepSizes()
     const panStep = pan * frameScale
-    const verticalStep = vertical * frameScale
     const dollyStep = dolly * frameScale
     const rotateStep = rotate * frameScale
-    const panAxes = bev ? getBevPanAxes() : null
-    const orbitRight = bev ? null : cameraVectors().right
-    const groundRight = bev
-      ? normalize([panAxes.right[0], panAxes.right[1], 0])
-      : normalize([orbitRight[0], orbitRight[1], 0])
-
-    if (pressedKeys.has('w')) dollyCamera(-dollyStep)
-    if (pressedKeys.has('s')) dollyCamera(dollyStep)
+    const { right, up } = getPanAxes()
+    if (pressedKeys.has('w')) {
+      keyboardOffset[0] += up[0] * panStep
+      keyboardOffset[1] += up[1] * panStep
+      keyboardOffset[2] += up[2] * panStep
+    }
+    if (pressedKeys.has('s')) {
+      keyboardOffset[0] -= up[0] * panStep
+      keyboardOffset[1] -= up[1] * panStep
+      keyboardOffset[2] -= up[2] * panStep
+    }
     if (pressedKeys.has('a')) {
-      keyboardOffset[0] += groundRight[0] * panStep
-      keyboardOffset[1] += groundRight[1] * panStep
+      keyboardOffset[0] -= right[0] * panStep
+      keyboardOffset[1] -= right[1] * panStep
+      keyboardOffset[2] -= right[2] * panStep
     }
     if (pressedKeys.has('d')) {
-      keyboardOffset[0] -= groundRight[0] * panStep
-      keyboardOffset[1] -= groundRight[1] * panStep
+      keyboardOffset[0] += right[0] * panStep
+      keyboardOffset[1] += right[1] * panStep
+      keyboardOffset[2] += right[2] * panStep
     }
-    if (pressedKeys.has('q')) {
-      keyboardOffset[2] += verticalStep
-    }
-    if (pressedKeys.has('e')) {
-      keyboardOffset[2] -= verticalStep
-    }
-    if (!bev) {
-      if (pressedKeys.has('arrowleft')) yaw -= rotateStep
-      if (pressedKeys.has('arrowright')) yaw += rotateStep
-      if (pressedKeys.has('arrowup')) pitch -= rotateStep
-      if (pressedKeys.has('arrowdown')) pitch += rotateStep
+    if (pressedKeys.has('q')) dollyCamera(-dollyStep)
+    if (pressedKeys.has('e')) dollyCamera(dollyStep)
+    if (!isBevMode()) {
+      if (pressedKeys.has('arrowleft')) applyOrbitRotation(-rotateStep, 0)
+      if (pressedKeys.has('arrowright')) applyOrbitRotation(rotateStep, 0)
+      if (pressedKeys.has('arrowup')) applyOrbitRotation(0, -rotateStep)
+      if (pressedKeys.has('arrowdown')) applyOrbitRotation(0, rotateStep)
     }
   }
 
@@ -872,22 +985,24 @@ export function createPointcloudEngine(canvas, stage, frame, callbacks = {}) {
 
   on(canvas, 'pointermove', (event) => {
     if (!isDragging) return
-    const dx = event.clientX - lastPointer[0]
-    const dy = event.clientY - lastPointer[1]
-    lastPointer = [event.clientX, event.clientY]
-    if (!dx && !dy) return
 
     const isPanDrag = dragButton === 2 || event.shiftKey
-    if (isBevMode()) {
-      if (!isPanDrag) return
-      pendingPan.dx += dx
-      pendingPan.dy += dy
-    } else if (isPanDrag) {
-      pendingPan.dx += dx
-      pendingPan.dy += dy
-    } else {
-      pendingRotate.dx += dx
-      pendingRotate.dy += dy
+    const moves = typeof event.getCoalescedEvents === 'function'
+      ? event.getCoalescedEvents()
+      : [event]
+
+    for (const moveEvent of moves) {
+      const dx = moveEvent.clientX - lastPointer[0]
+      const dy = moveEvent.clientY - lastPointer[1]
+      lastPointer = [moveEvent.clientX, moveEvent.clientY]
+      if (!dx && !dy) continue
+
+      if (isBevMode() || isPanDrag) {
+        pendingPan.dx += dx
+        pendingPan.dy += dy
+      } else {
+        applyPointerRotateDrag(dx, dy)
+      }
     }
     scheduleRender()
   })

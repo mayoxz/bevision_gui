@@ -148,24 +148,16 @@
   padding: 0;
 }
 
-.app-sidebar :is(.app-sidebar__btn, .app-sidebar__icon-btn):hover:not(:disabled) {
+.app-sidebar :is(.app-sidebar__btn, .app-sidebar__icon-btn):hover:not(.app-sidebar__mode-btn--active) {
   border-color: color-mix(in srgb, var(--sb-text-strong) 35%, var(--sb-border));
-}
-
-.app-sidebar :is(.app-sidebar__icon-btn, .app-sidebar__btn, .app-sidebar__mode-btn):disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.app-sidebar__btn:disabled:hover {
-  border-color: var(--sb-border);
 }
 
 .app-sidebar :is(
   .app-sidebar__link,
   .app-sidebar__select,
   .app-sidebar__icon-btn,
-  .app-sidebar__btn
+  .app-sidebar__btn,
+  .app-sidebar__mode-btn
 ):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -233,16 +225,20 @@
   color: var(--sb-text);
 }
 
-.app-sidebar__mode-btn:hover:not(:disabled):not(.app-sidebar__mode-btn--active) {
+.app-sidebar__mode-btn:hover:not(.app-sidebar__mode-btn--active) {
   color: var(--sb-text-strong);
   border-color: color-mix(in srgb, var(--sb-text) 25%, var(--sb-border));
 }
 
-.app-sidebar__mode-btn--active {
-  background: color-mix(in srgb, var(--sb-text-strong) 7%, var(--code-bg));
-  border-color: color-mix(in srgb, var(--sb-text-strong) 45%, var(--sb-border));
-  color: var(--sb-text-strong);
-  font-weight: 500;
+.app-sidebar .app-sidebar__mode-btn.app-sidebar__mode-btn--active {
+  background: color-mix(in srgb, var(--accent) 22%, var(--code-bg));
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.app-sidebar .app-sidebar__mode-btn.app-sidebar__mode-btn--active:hover {
+  border-color: var(--accent);
 }
 
 .app-sidebar__status {

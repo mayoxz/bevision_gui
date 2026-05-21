@@ -48,7 +48,7 @@ export function usePointcloudController(active) {
     let lastZoomLabel = ''
     let lastOrientationLabels = null
     let lastPerfLabel = ''
-    let fpsIdleTimer = 0
+    let loadedPointCount = 0
 
     try {
       engine = createPointcloudEngine(canvas, stage, frame, {
@@ -68,23 +68,20 @@ export function usePointcloudController(active) {
           setOrientationLabels(lastOrientationLabels)
         },
         onFps: (fps, count) => {
-          const countLabel = count >= 1_000_000
-            ? `${(count / 1_000_000).toFixed(1)}M pts`
-            : count >= 1000
-              ? `${Math.round(count / 1000)}k pts`
-              : count > 0
-                ? `${count} pts`
-                : ''
-          const next = count > 0 ? `${fps} FPS · ${countLabel}` : ''
-          if (next !== lastPerfLabel) {
-            lastPerfLabel = next
-            setPerfLabel(next)
-          }
-          if (fpsIdleTimer) window.clearTimeout(fpsIdleTimer)
-          fpsIdleTimer = window.setTimeout(() => {
-            lastPerfLabel = ''
-            setPerfLabel('')
-          }, 1500)
+          if (count > 0) loadedPointCount = count
+          if (loadedPointCount <= 0) return
+
+          const displayCount = count > 0 ? count : loadedPointCount
+          const countLabel = displayCount >= 1_000_000
+            ? `${(displayCount / 1_000_000).toFixed(1)}M pts`
+            : displayCount >= 1000
+              ? `${Math.round(displayCount / 1000)}k pts`
+              : `${displayCount} pts`
+          const fpsText = fps > 0 ? `${fps} FPS` : '— FPS'
+          const next = `${fpsText} · ${countLabel}`
+          if (next === lastPerfLabel) return
+          lastPerfLabel = next
+          setPerfLabel(next)
         },
       })
       engineRef.current = engine
@@ -93,13 +90,13 @@ export function usePointcloudController(active) {
     }
 
     return () => {
-      if (fpsIdleTimer) window.clearTimeout(fpsIdleTimer)
       engine.destroy()
       engineRef.current = null
       setCanResetView(false)
       setViewMode('perspective')
       setOrientationLabels(null)
       setPerfLabel('')
+      loadedPointCount = 0
     }
   }, [active])
 

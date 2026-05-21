@@ -112,7 +112,6 @@ function PointcloudControls({ controls }) {
             type="button"
             className="app-sidebar__icon-btn"
             onClick={blurAfterClick(onResetZoom)}
-            disabled={!canResetView}
             title={canResetView ? '현재 모드의 초기 줌으로 복원' : '파일을 먼저 불러오세요'}
             aria-label="Reset zoom"
           >
@@ -129,7 +128,6 @@ function PointcloudControls({ controls }) {
             type="button"
             className={`app-sidebar__btn app-sidebar__mode-btn${viewMode === id ? ' app-sidebar__mode-btn--active' : ''}`}
             aria-pressed={viewMode === id}
-            disabled={!canResetView}
             title={title}
             onClick={blurAfterClick(() => onViewModeSelect(id))}
           >
@@ -143,7 +141,6 @@ function PointcloudControls({ controls }) {
           type="button"
           className="app-sidebar__btn"
           onClick={blurAfterClick(onResetPosition)}
-          disabled={!canResetView}
           title={canResetView ? '현재 모드의 초기 위치·각도로 복원' : '파일을 먼저 불러오세요'}
         >
           Reset position

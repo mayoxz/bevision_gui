@@ -42,11 +42,9 @@ export default function PointcloudViewer({
               <AxisLabel label="Back" position={orientationLabels.back} />
             </>
           ) : null}
-          {perfLabel ? (
-            <div className="pc-viewer__perf" aria-live="polite">
-              {perfLabel}
-            </div>
-          ) : null}
+          <div className="pc-viewer__perf" aria-live="polite">
+            {perfLabel}
+          </div>
           <div className={`pc-viewer__drop${dropHintHidden ? ' pc-viewer__drop--hidden' : ''}`} id="pc-drop-hint">
             Drop nuScenes .pcd.bin or RADAR .pcd files here, or choose them in the sidebar.
           </div>
