@@ -1,5 +1,6 @@
 export const NAV_ITEMS = [
   { id: 'epoch-logs', label: 'Epoch logs (waymo)', section: 'dashboard' },
+  { id: 'outcome-cases', label: 'Outcome cases', section: 'dashboard' },
   { id: 'nus-mini:eval', label: 'NuScenes-mini · eval', section: 'dashboard' },
   { id: 'nus-mini:smoke', label: 'NuScenes-mini · smoke', section: 'dashboard' },
   { id: 'nuscenes:eval', label: 'NuScenes · eval', section: 'dashboard' },
@@ -16,6 +17,9 @@ export const NAV_ITEMS = [
 export function parseViewId(viewId) {
   if (viewId === 'epoch-logs') {
     return { dataset: 'epoch-logs', runKind: 'eval' }
+  }
+  if (viewId === 'outcome-cases') {
+    return { dataset: 'outcome-cases', runKind: 'eval' }
   }
   if (viewId === 'pointcloud') {
     return { dataset: null, runKind: null }

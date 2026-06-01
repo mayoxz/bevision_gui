@@ -5,10 +5,14 @@ const lazyRoutes = {
   'nus-mini:smoke': lazy(() => import('../spa/nuscenes-mini-smoke/index.jsx')),
   'nuscenes:eval': lazy(() => import('../spa/nuscenes-eval/index.jsx')),
   'epoch-logs': lazy(() => import('../spa/epoch-logs/index.jsx')),
+  'outcome-cases': lazy(() => import('../spa/outcome-cases/index.jsx')),
 }
 
 export function SpaViewport({ dataset, runKind }) {
-  const routeKey = dataset === 'epoch-logs' ? 'epoch-logs' : `${dataset}:${runKind}`
+  const routeKey =
+    dataset === 'epoch-logs' || dataset === 'outcome-cases'
+      ? dataset
+      : `${dataset}:${runKind}`
   const LazyComp = lazyRoutes[routeKey] ?? null
 
   if (!LazyComp) {

@@ -9,7 +9,7 @@ export default function NuscenesMiniSmoke() {
   return (
     <div className="spa-view spa-view--smoke" data-spa="nuscenes-mini-smoke">
       <h1 className="spa-view__title">NuScenes-mini · smoke</h1>
-      <p className="spa-view__msg">
+      <p className="spa-view__msg" hidden>
         src ={' '}
         <code className="spa-view__inline-code">{getDataSourceDisplayUrl('nus-mini/smoke')}</code>
       </p>
