@@ -10,9 +10,9 @@ export const LABEL_META = {
   lighting: {
     label: 'Lighting',
     type: 'categorical',
-    valueLabels: { day: 'Day', dusk: 'Dusk', night: 'Night' },
-    order: ['night', 'dusk', 'day'],
-    ordinal: { night: 0, dusk: 1, day: 2 },
+    valueLabels: { night: 'Night', daylight: 'Day / Dusk' },
+    order: ['night', 'daylight'],
+    ordinal: { night: 0, daylight: 1 },
   },
   hazy: {
     label: 'Hazy',
@@ -41,11 +41,14 @@ export const TWO_WAY_PAIRS = [
 ]
 
 export const VALUE_COLORS = {
-  lighting: { night: '#6366f1', dusk: '#f59e0b', day: '#22c55e' },
+  lighting: { night: '#6366f1', daylight: '#22c55e' },
   hazy: { false: '#94a3b8', true: '#c026d3' },
   raindrop_stain: { false: '#38bdf8', true: '#ef4444' },
   environment: { urban: '#64748b', rural_green: '#16a34a' },
 }
+
+const RAW_LIGHTING_VALUE_LABELS = { night: 'Night', day: 'Day', dusk: 'Dusk' }
+const RAW_LIGHTING_COLORS = { night: '#6366f1', dusk: '#f59e0b', day: '#22c55e' }
 
 const FULL_COMBO_MIN_N = 10
 
@@ -100,8 +103,42 @@ function encodeLabel(field, value) {
   return meta.ordinal?.[value] ?? 0
 }
 
+function normalizeLabelValue(field, value) {
+  if (field === 'lighting' && (value === 'day' || value === 'dusk')) return 'daylight'
+  return value
+}
+
 function formatLabelValue(field, value) {
-  return LABEL_META[field].valueLabels[value] ?? String(value)
+  return LABEL_META[field].valueLabels[normalizeLabelValue(field, value)] ?? String(value)
+}
+
+export function formatCaseLabelEntries(labels) {
+  return SCENE_LABEL_KEYS.map((field) => ({
+    field,
+    label: LABEL_META[field].label,
+    value: formatLabelValue(field, labels[field]),
+    color: VALUE_COLORS[field][labels[field]],
+  }))
+}
+
+export function formatCasePreviewEntries(rawLabels) {
+  return SCENE_LABEL_KEYS.map((field) => {
+    const value = rawLabels[field]
+    if (field === 'lighting') {
+      return {
+        field,
+        label: LABEL_META[field].label,
+        value: RAW_LIGHTING_VALUE_LABELS[value] ?? String(value),
+        color: RAW_LIGHTING_COLORS[value] ?? VALUE_COLORS.lighting[normalizeLabelValue('lighting', value)],
+      }
+    }
+    return {
+      field,
+      label: LABEL_META[field].label,
+      value: formatLabelValue(field, value),
+      color: VALUE_COLORS[field][value],
+    }
+  })
 }
 
 function groupRanksByValue(rows, field) {
@@ -165,6 +202,9 @@ function buildStripCharts(rows, singleCategory) {
       points: rows.map((row, index) => ({
         id: row.id ?? `row-${index}`,
         rank: row.rank,
+        imgName: row.imgName ?? null,
+        labels: row.labels,
+        rawLabels: row.rawLabels,
         bandKey: String(row.labels[field]),
       })),
     }
@@ -201,6 +241,9 @@ function buildTwoWayStripCharts(rows) {
         points: panelRows.map((row) => ({
           id: row.id,
           rank: row.rank,
+          imgName: row.imgName ?? null,
+          labels: row.labels,
+          rawLabels: row.rawLabels,
           bandKey: comboKey(row.labels[fieldA], valueB),
         })),
       }
@@ -253,7 +296,14 @@ export function analyzeOutcomeCases(results) {
     .map((row, index) => ({
       id: row.sample_token ?? `rank-${row.rank}-${index}`,
       rank: row.rank,
+      imgName: row.img_name ?? null,
       labels: {
+        lighting: normalizeLabelValue('lighting', row.labels.lighting),
+        hazy: Boolean(row.labels.hazy),
+        raindrop_stain: Boolean(row.labels.raindrop_stain),
+        environment: row.labels.environment,
+      },
+      rawLabels: {
         lighting: row.labels.lighting,
         hazy: Boolean(row.labels.hazy),
         raindrop_stain: Boolean(row.labels.raindrop_stain),

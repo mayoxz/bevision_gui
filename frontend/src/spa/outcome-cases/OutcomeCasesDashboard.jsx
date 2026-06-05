@@ -4,11 +4,24 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { resolveDataUrl } from '../../config/dataUrl.js'
-import { analyzeOutcomeCases } from './outcomeCasesStats.js'
+import { analyzeOutcomeCases, formatCasePreviewEntries } from './outcomeCasesStats.js'
 import { bandsToLegendItems, getChartTheme, saveOutcomeChartPng, sortBands, STRIP_LAYOUT } from './exportChartPng.js'
 import { detectStripClusters } from './stripChartClusters.js'
 
 const DATA_PATH = 'outcome-cases/bottom10_scene_labels.json'
+const VIS_ROOT = 'Visualization/val'
+
+function visualizationImageFileName(rank, imgName) {
+  if (!imgName || !Number.isFinite(rank)) return null
+  const prefix = String(Math.round(rank)).padStart(3, '0')
+  return `${prefix}_${imgName}`
+}
+
+function resolveVisualizationImageUrl(rank, imgName, kind) {
+  const fileName = visualizationImageFileName(rank, imgName)
+  if (!fileName) return null
+  return resolveDataUrl(`${VIS_ROOT}/${kind}/${fileName}`)
+}
 
 async function fetchSceneLabels() {
   const res = await fetch(resolveDataUrl(DATA_PATH))
@@ -24,6 +37,13 @@ function fmtRank(value) {
 
 function fmtRho(value) {
   return value == null ? '—' : value.toFixed(3)
+}
+
+function fmtCaseCategories(rawLabels) {
+  if (!rawLabels) return '—'
+  return formatCasePreviewEntries(rawLabels)
+    .map((entry) => `${entry.label}: ${entry.value}`)
+    .join(' · ')
 }
 
 function jitterOffset(id, bandHeight) {
@@ -99,7 +119,7 @@ function SummaryCards({ analysis, meta }) {
   )
 }
 
-function RankStripSvg({ bands, points, rankMin, rankMax, padL, field, compact = false }) {
+function RankStripSvg({ bands, points, rankMin, rankMax, padL, field, compact = false, onDotPress, onDotRelease }) {
   const theme = useMemo(() => getChartTheme(), [])
   const orderedBands = useMemo(() => sortBands(bands, field), [bands, field])
   const layout = compact ? STRIP_LAYOUT.compact : STRIP_LAYOUT.full
@@ -134,6 +154,8 @@ function RankStripSvg({ bands, points, rankMin, rankMax, padL, field, compact = 
           return {
             id: `${point.id}-${point.bandKey}`,
             rank: point.rank,
+            imgName: point.imgName ?? null,
+            rawLabels: point.rawLabels,
             cx: sx(point.rank),
             cy: bandCenterY(band.index) + jitterOffset(point.id, bandRowH),
             color: band.color,
@@ -242,7 +264,26 @@ function RankStripSvg({ bands, points, rankMin, rankMax, padL, field, compact = 
         />
       ))}
       {dots.map((dot) => (
-        <circle key={dot.id} cx={dot.cx} cy={dot.cy} r={compact ? 2.3 : 2.8} fill={dot.color} opacity="0.52" />
+        <g
+          key={dot.id}
+          className={`outcome-strip-chart__dot${dot.imgName ? ' outcome-strip-chart__dot--preview' : ''}`}
+          onPointerDown={
+            dot.imgName
+              ? (event) => {
+                  if (event.button !== 0) return
+                  event.preventDefault()
+                  onDotPress?.(dot)
+                }
+              : undefined
+          }
+          onPointerUp={dot.imgName ? () => onDotRelease?.() : undefined}
+          onPointerCancel={dot.imgName ? () => onDotRelease?.() : undefined}
+          onPointerLeave={dot.imgName ? () => onDotRelease?.() : undefined}
+        >
+          <circle cx={dot.cx} cy={dot.cy} r={compact ? 7 : 8} fill="transparent" />
+          <circle cx={dot.cx} cy={dot.cy} r={compact ? 2.3 : 2.8} fill={dot.color} opacity="0.52" />
+          <title>{`Rank ${fmtRank(dot.rank)} · ${fmtCaseCategories(dot.rawLabels)}`}</title>
+        </g>
       ))}
     </svg>
   )
@@ -265,6 +306,49 @@ function BandStatsRow({ bands, field, compact = false }) {
   )
 }
 
+function DotHoldPreview({ hold }) {
+  const { dot } = hold
+  const gtUrl = resolveVisualizationImageUrl(dot.rank, dot.imgName, 'ground_truth')
+  const predUrl = resolveVisualizationImageUrl(dot.rank, dot.imgName, 'prediction')
+  const categories = useMemo(
+    () => (dot.rawLabels ? formatCasePreviewEntries(dot.rawLabels) : []),
+    [dot.rawLabels],
+  )
+  if (!gtUrl && !predUrl) return null
+
+  return (
+    <div className="outcome-strip-chart__hold-overlay" aria-hidden>
+      <div className="outcome-strip-chart__hold-panel">
+        <div className="outcome-strip-chart__hold-head">
+          <div className="outcome-strip-chart__hold-rank">Rank {fmtRank(dot.rank)}</div>
+          <div className="outcome-strip-chart__hold-categories">
+            {categories.map((entry) => (
+              <span key={entry.field} className="outcome-strip-chart__hold-category">
+                <span
+                  className="outcome-strip-chart__hold-category-swatch"
+                  style={{ background: entry.color }}
+                  aria-hidden
+                />
+                {entry.label}: {entry.value}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="outcome-strip-chart__hold-images">
+          <figure>
+            <figcaption>Ground truth</figcaption>
+            {gtUrl ? <img src={gtUrl} alt="" /> : <p className="outcome-strip-chart__hold-missing">—</p>}
+          </figure>
+          <figure>
+            <figcaption>Prediction</figcaption>
+            {predUrl ? <img src={predUrl} alt="" /> : <p className="outcome-strip-chart__hold-missing">—</p>}
+          </figure>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ChartAxisFooter({ padL, compact = false }) {
   const layout = compact ? STRIP_LAYOUT.compact : STRIP_LAYOUT.full
   const leftPad = padL ?? layout.padL
@@ -281,6 +365,19 @@ function ChartAxisFooter({ padL, compact = false }) {
 }
 
 function StripChartPlot({ bands, points, rankMin, rankMax, padL, field, compact = false }) {
+  const [hold, setHold] = useState(null)
+
+  useEffect(() => {
+    if (!hold) return undefined
+    const release = () => setHold(null)
+    window.addEventListener('pointerup', release)
+    window.addEventListener('pointercancel', release)
+    return () => {
+      window.removeEventListener('pointerup', release)
+      window.removeEventListener('pointercancel', release)
+    }
+  }, [hold])
+
   return (
     <div className="outcome-strip-chart__plot">
       <RankStripSvg
@@ -291,7 +388,12 @@ function StripChartPlot({ bands, points, rankMin, rankMax, padL, field, compact 
         padL={padL}
         field={field}
         compact={compact}
+        onDotPress={(dot) => {
+          if (dot.imgName) setHold({ dot })
+        }}
+        onDotRelease={() => setHold(null)}
       />
+      {hold ? <DotHoldPreview hold={hold} /> : null}
       <ChartAxisFooter padL={padL} compact={compact} />
     </div>
   )

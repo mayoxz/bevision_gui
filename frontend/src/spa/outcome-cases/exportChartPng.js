@@ -13,7 +13,7 @@ const SVG_ATTRS = [
 ]
 
 const LEGEND_DISPLAY_ORDER = {
-  lighting: ['Night', 'Dusk', 'Day'],
+  lighting: ['Night', 'Day / Dusk'],
   environment: ['Urban', 'Rural green'],
   hazy: ['Clear', 'Hazy'],
   raindrop_stain: ['Dry', 'Rain stain'],
