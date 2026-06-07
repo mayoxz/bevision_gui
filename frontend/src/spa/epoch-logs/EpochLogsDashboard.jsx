@@ -5,7 +5,7 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import { resolveDataUrl } from '../../config/dataUrl.js'
 
-const EPOCH_SCAN_MAX = 256
+const EPOCH_SCAN_MAX = 24
 const EPOCH_SCAN_MISS_LIMIT = 5
 
 const LOSS_SERIES = [
