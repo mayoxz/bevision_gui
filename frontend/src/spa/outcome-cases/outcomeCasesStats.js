@@ -4,81 +4,47 @@
 
 import { STRIP_LAYOUT } from './exportChartPng.js'
 
-export const SCENE_LABEL_KEYS = ['lighting', 'lens']
+export const SCENE_LABEL_KEYS = ['time', 'rain']
 
-/** Strip chart built in analyzeOutcomeCases; scene_combo is toggled in the dashboard. */
-export const STRIP_CHART_FIELDS = ['lighting']
+export const STRIP_CHART_FIELDS = ['time']
 
-const SCENE_COMBO_MODES = {
-  combined: {
-    field: 'scene_combo',
-    label: 'Day lens / Night',
-    valueLabels: {
-      day_clear: 'Day · Clear',
-      day_raindrop: 'Day · Raindrop',
-      night: 'Night',
-    },
-    order: ['day_clear', 'day_raindrop', 'night'],
-    ordinal: { day_clear: 0, day_raindrop: 1, night: 2 },
-    colors: {
-      day_clear: '#22c55e',
-      day_raindrop: '#ef4444',
-      night: '#6366f1',
-    },
+const SCENE_COMBO = {
+  field: 'scene_combo',
+  label: 'Scene',
+  valueLabels: {
+    day_clear: 'day-clear',
+    day_raindrop: 'day-raindrop',
+    night_wet: 'night-wet',
   },
-  split: {
-    field: 'scene_combo_split',
-    label: 'Day lens / Night lens',
-    valueLabels: {
-      day_clear: 'Day · Clear',
-      day_raindrop: 'Day · Raindrop',
-      night_clear: 'Night · Clear',
-      night_raindrop: 'Night · Raindrop',
-    },
-    order: ['day_clear', 'day_raindrop', 'night_clear', 'night_raindrop'],
-    ordinal: { day_clear: 0, day_raindrop: 1, night_clear: 2, night_raindrop: 3 },
-    colors: {
-      day_clear: '#22c55e',
-      day_raindrop: '#ef4444',
-      night_clear: '#818cf8',
-      night_raindrop: '#c084fc',
-    },
+  order: ['day_clear', 'day_raindrop', 'night_wet'],
+  ordinal: { day_clear: 0, day_raindrop: 1, night_wet: 2 },
+  colors: {
+    day_clear: '#22c55e',
+    day_raindrop: '#ef4444',
+    night_wet: '#6366f1',
   },
 }
 
 export const LABEL_META = {
-  lighting: {
+  time: {
     label: 'Lighting',
     type: 'categorical',
     valueLabels: { day: 'Day', night: 'Night' },
     order: ['day', 'night'],
     ordinal: { day: 0, night: 1 },
   },
-  lens: {
-    label: 'Lens',
+  rain: {
+    label: 'Rain',
     type: 'categorical',
-    valueLabels: { clear: 'Clear', raindrop: 'Raindrop' },
-    order: ['clear', 'raindrop'],
-    ordinal: { clear: 0, raindrop: 1 },
-  },
-  scene_combo: {
-    label: SCENE_COMBO_MODES.combined.label,
-    type: 'categorical',
-    valueLabels: SCENE_COMBO_MODES.combined.valueLabels,
-    order: SCENE_COMBO_MODES.combined.order,
-    ordinal: SCENE_COMBO_MODES.combined.ordinal,
+    valueLabels: { clear: 'Clear', raindrop: 'Raindrop', wet: 'Wet' },
+    order: ['clear', 'raindrop', 'wet'],
+    ordinal: { clear: 0, raindrop: 1, wet: 2 },
   },
 }
 
 export const VALUE_COLORS = {
-  lighting: { day: '#22c55e', night: '#6366f1' },
-  lens: { clear: '#94a3b8', raindrop: '#ef4444' },
-  scene_combo: SCENE_COMBO_MODES.combined.colors,
-  scene_combo_split: SCENE_COMBO_MODES.split.colors,
-}
-
-export function getSceneComboMode(splitNight) {
-  return SCENE_COMBO_MODES[splitNight ? 'split' : 'combined']
+  time: { day: '#22c55e', night: '#6366f1' },
+  rain: { clear: '#94a3b8', raindrop: '#ef4444', wet: '#818cf8' },
 }
 
 function median(values) {
@@ -135,12 +101,9 @@ function formatLabelValue(field, value) {
   return LABEL_META[field].valueLabels[value] ?? String(value)
 }
 
-export function deriveSceneCombo(labels, splitNight = false) {
-  if (labels.lighting === 'night') {
-    if (!splitNight) return 'night'
-    return labels.lens === 'raindrop' ? 'night_raindrop' : 'night_clear'
-  }
-  if (labels.lens === 'raindrop') return 'day_raindrop'
+export function deriveSceneCombo(labels) {
+  if (labels.time === 'night') return 'night_wet'
+  if (labels.rain === 'raindrop') return 'day_raindrop'
   return 'day_clear'
 }
 
@@ -195,11 +158,10 @@ function buildSingleCategoryStats(rows) {
   })
 }
 
-export function buildSceneComboStripChart(rows, splitNight = false) {
-  const mode = getSceneComboMode(splitNight)
+function buildSceneComboStripChart(rows) {
   const comboRows = rows.map((row, index) => ({
     ...row,
-    combo: deriveSceneCombo(row.rawLabels, splitNight),
+    combo: deriveSceneCombo(row.rawLabels),
     id: row.id ?? `row-${index}`,
   }))
   const groups = {}
@@ -208,20 +170,20 @@ export function buildSceneComboStripChart(rows, splitNight = false) {
     groups[row.combo].push(row.rank)
   }
   const ranks = comboRows.map((row) => row.rank)
-  const encoded = comboRows.map((row) => mode.ordinal[row.combo] ?? 0)
+  const encoded = comboRows.map((row) => SCENE_COMBO.ordinal[row.combo] ?? 0)
   const rho = spearmanRho(ranks, encoded)
 
   return {
-    field: mode.field,
-    label: mode.label,
+    field: SCENE_COMBO.field,
+    label: SCENE_COMBO.label,
     rho,
     padL: STRIP_LAYOUT.full.padL,
-    bands: mode.order.map((value) => {
+    bands: SCENE_COMBO.order.map((value) => {
       const fieldRanks = groups[value] ?? []
       return {
         key: String(value),
-        display: mode.valueLabels[value],
-        color: mode.colors[value],
+        display: SCENE_COMBO.valueLabels[value],
+        color: SCENE_COMBO.colors[value],
         n: fieldRanks.length,
         meanRank: mean(fieldRanks),
         medianRank: median(fieldRanks),
@@ -275,45 +237,39 @@ function buildStripCharts(rows, singleCategory) {
 
 export function analyzeOutcomeCases(results) {
   const rows = results
-    .filter((row) => row?.labels?.lighting && Number.isFinite(row.rank))
+    .filter((row) => row?.labels?.time && Number.isFinite(row.rank))
     .map((row, index) => {
-      const lighting = row.labels.lighting
-      const lens = row.labels.lens ?? 'clear'
-      const rawLabels = { lighting, lens }
+      const time = row.labels.time
+      const rain = row.labels.rain ?? 'clear'
+      const rawLabels = { time, rain }
       const sceneCombo = deriveSceneCombo(rawLabels)
       return {
         id: row.sample_token ?? `rank-${row.rank}-${index}`,
         rank: row.rank,
         imgName: row.img_name ?? null,
         reference: row.reference ?? null,
-        labels: {
-          lighting,
-          lens,
-          scene_combo: sceneCombo,
-        },
+        labels: { time, rain, scene_combo: sceneCombo },
         rawLabels,
       }
     })
 
   const singleCategory = buildSingleCategoryStats(rows)
-  const stripCharts = buildStripCharts(rows, singleCategory)
-  const sceneComboCategory = (() => {
-    const chart = buildSceneComboStripChart(rows, false)
-    return {
-      field: chart.field,
-      label: chart.label,
-      rho: chart.rho,
-      values: chart.bands
-        .filter((band) => band.n > 0)
-        .map((band) => ({
-          value: band.key,
-          display: band.display,
-          n: band.n,
-          meanRank: band.meanRank,
-          medianRank: band.medianRank,
-        })),
-    }
-  })()
+  const sceneComboChart = buildSceneComboStripChart(rows)
+  const sceneComboCategory = {
+    field: sceneComboChart.field,
+    label: sceneComboChart.label,
+    rho: sceneComboChart.rho,
+    values: sceneComboChart.bands
+      .filter((band) => band.n > 0)
+      .map((band) => ({
+        value: band.key,
+        display: band.display,
+        n: band.n,
+        meanRank: band.meanRank,
+        medianRank: band.medianRank,
+      })),
+  }
+  const stripCharts = [...buildStripCharts(rows, singleCategory), sceneComboChart]
   const rankRange = rows.length
     ? { min: Math.min(...rows.map((row) => row.rank)), max: Math.max(...rows.map((row) => row.rank)) }
     : null

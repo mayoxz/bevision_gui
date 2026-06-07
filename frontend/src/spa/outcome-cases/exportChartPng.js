@@ -13,10 +13,9 @@ const SVG_ATTRS = [
 ]
 
 const LEGEND_DISPLAY_ORDER = {
-  lighting: ['Day', 'Night'],
-  lens: ['Clear', 'Raindrop'],
-  scene_combo: ['Day · Clear', 'Day · Raindrop', 'Night'],
-  scene_combo_split: ['Day · Clear', 'Day · Raindrop', 'Night · Clear', 'Night · Raindrop'],
+  time: ['Day', 'Night'],
+  rain: ['Clear', 'Raindrop', 'Wet'],
+  scene_combo: ['day-clear', 'day-raindrop', 'night-wet'],
 }
 
 function sortLegendItems(items, field) {

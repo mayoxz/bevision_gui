@@ -1,9 +1,9 @@
 export const NAV_ITEMS = [
-  { id: 'epoch-logs', label: 'Epoch logs (waymo)', section: 'dashboard' },
   { id: 'outcome-cases', label: 'Outcome cases', section: 'dashboard' },
   { id: 'nus-mini:eval', label: 'NuScenes-mini · eval', section: 'dashboard' },
   { id: 'nus-mini:smoke', label: 'NuScenes-mini · smoke', section: 'dashboard' },
   { id: 'nuscenes:eval', label: 'NuScenes · eval', section: 'dashboard' },
+  { id: 'epoch-logs', label: 'Epoch logs (waymo)', section: 'dashboard' },
   { id: 'pointcloud', label: 'Point Cloud Viewer', section: 'tools' },
   { id: 'nuscenes-home', label: 'nuScenes', section: 'external', href: 'https://www.nuscenes.org/' },
   {

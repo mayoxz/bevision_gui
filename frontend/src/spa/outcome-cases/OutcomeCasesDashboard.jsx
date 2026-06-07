@@ -4,11 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { resolveDataUrl } from '../../config/dataUrl.js'
-import {
-  analyzeOutcomeCases,
-  buildSceneComboStripChart,
-  formatCasePreviewEntries,
-} from './outcomeCasesStats.js'
+import { analyzeOutcomeCases, formatCasePreviewEntries } from './outcomeCasesStats.js'
 import {
   bandsToLegendItems,
   getChartTheme,
@@ -568,42 +564,20 @@ function CategoryRankStripChart({ chart, rankMin, rankMax, controls = null }) {
   )
 }
 
-function SceneComboRankStripChart({ rows, rankMin, rankMax }) {
-  const [splitNight, setSplitNight] = useState(false)
-  const chart = useMemo(() => buildSceneComboStripChart(rows, splitNight), [rows, splitNight])
-
-  return (
-    <CategoryRankStripChart
-      chart={chart}
-      rankMin={rankMin}
-      rankMax={rankMax}
-      controls={
-        <label className="outcome-dash__toggle">
-          <input
-            type="checkbox"
-            checked={splitNight}
-            onChange={(event) => setSplitNight(event.target.checked)}
-          />
-          <span>Night clear/raindrop 분리</span>
-        </label>
-      }
-    />
-  )
-}
-
-function DistributionSection({ stripCharts, rows, rankRange }) {
-  if (!stripCharts.length || !rankRange || !rows?.length) return null
-  const lightingChart = stripCharts[0]
+function DistributionSection({ stripCharts, rankRange }) {
+  if (!stripCharts.length || !rankRange) return null
 
   return (
     <section className="eval-dash__section">
       <h2 className="eval-dash__h2">등수 분포</h2>
-      <CategoryRankStripChart
-        chart={lightingChart}
-        rankMin={rankRange.min}
-        rankMax={rankRange.max}
-      />
-      <SceneComboRankStripChart rows={rows} rankMin={rankRange.min} rankMax={rankRange.max} />
+      {stripCharts.map((chart) => (
+        <CategoryRankStripChart
+          key={chart.field}
+          chart={chart}
+          rankMin={rankRange.min}
+          rankMax={rankRange.max}
+        />
+      ))}
     </section>
   )
 }
@@ -652,11 +626,7 @@ export default function OutcomeCasesDashboard() {
   return (
     <div className="eval-dashboard outcome-dashboard">
       <SummaryCards analysis={analysis} meta={payload?.meta} />
-      <DistributionSection
-        stripCharts={analysis.stripCharts}
-        rows={analysis.rows}
-        rankRange={analysis.rankRange}
-      />
+      <DistributionSection stripCharts={analysis.stripCharts} rankRange={analysis.rankRange} />
     </div>
   )
 }
