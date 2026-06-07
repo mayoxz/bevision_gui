@@ -1,5 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { resolveDataUrl } from '../../config/dataUrl.js'
 import { createPointcloudEngine } from '../../viz/pointcloud/engine.js'
+
+const VIEWER_EXAMPLES = [
+  {
+    id: 'example01',
+    label: 'example01',
+    path: 'viewer-examples/n015-2018-07-18-11-50-34+0800__LIDAR_TOP__1531886124098526.pcd.bin',
+  },
+  {
+    id: 'example02',
+    label: 'example02',
+    path: 'viewer-examples/n015-2018-07-24-11-13-19+0800__LIDAR_TOP__1532402014097363.pcd.bin',
+  },
+  {
+    id: 'example03',
+    label: 'example03',
+    path: 'viewer-examples/n015-2018-08-02-17-16-37+0800__LIDAR_TOP__1533201489598840.pcd.bin',
+  },
+]
 
 const ORIENTATION_LABEL_EPS = 0.005
 
@@ -36,6 +55,8 @@ export function usePointcloudController(active) {
   const [dropHintHidden, setDropHintHidden] = useState(false)
   const [orientationLabels, setOrientationLabels] = useState(null)
   const [perfLabel, setPerfLabel] = useState('')
+  const [activeExampleId, setActiveExampleId] = useState('')
+  const [loadingExampleId, setLoadingExampleId] = useState('')
 
   useEffect(() => {
     if (!active) return undefined
@@ -106,8 +127,34 @@ export function usePointcloudController(active) {
 
   const onFileChange = useCallback((event) => {
     const files = event.target.files
-    if (files?.length) engineRef.current?.loadFiles(files)
+    if (files?.length) {
+      setActiveExampleId('')
+      engineRef.current?.loadFiles(files)
+    }
     event.target.value = ''
+  }, [])
+
+  const onLoadExample = useCallback(async (exampleId) => {
+    const example = VIEWER_EXAMPLES.find((item) => item.id === exampleId)
+    if (!example || !engineRef.current) return
+
+    setLoadingExampleId(exampleId)
+    try {
+      const response = await fetch(resolveDataUrl(example.path))
+      if (!response.ok) throw new Error(`Example not found (${example.label})`)
+
+      const buffer = await response.arrayBuffer()
+      const filename = example.path.split('/').pop()
+      const file = new File([buffer], filename, { type: 'application/octet-stream' })
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      await engineRef.current.loadFiles([file])
+      setActiveExampleId(exampleId)
+    } catch (error) {
+      setActiveExampleId('')
+      setFileLabel('Error', error.message)
+    } finally {
+      setLoadingExampleId('')
+    }
   }, [])
 
   const onColorModeChange = useCallback((event) => {
@@ -141,6 +188,7 @@ export function usePointcloudController(active) {
   const onClearFiles = useCallback(() => {
     engineRef.current?.clearFiles()
     if (fileInputRef.current) fileInputRef.current.value = ''
+    setActiveExampleId('')
   }, [])
 
   const openFilePicker = useCallback(() => {
@@ -178,6 +226,10 @@ export function usePointcloudController(active) {
       onSavePng,
       openFilePicker,
       onClearFiles,
+      examples: VIEWER_EXAMPLES,
+      activeExampleId,
+      loadingExampleId,
+      onLoadExample,
     },
   }
 }

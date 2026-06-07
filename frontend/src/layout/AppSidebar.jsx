@@ -76,6 +76,10 @@ function PointcloudControls({ controls }) {
     openFilePicker,
     onClearFiles,
     canResetView,
+    examples,
+    activeExampleId,
+    loadingExampleId,
+    onLoadExample,
   } = controls
 
   return (
@@ -188,6 +192,26 @@ function PointcloudControls({ controls }) {
           Save PNG
         </button>
       </div>
+
+      {examples?.length ? (
+        <>
+          <p className="app-sidebar__heading">Examples</p>
+          <div className="app-sidebar__mode-row" role="group" aria-label="Example data">
+            {examples.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                className={`app-sidebar__btn app-sidebar__mode-btn${activeExampleId === id ? ' app-sidebar__mode-btn--active' : ''}`}
+                aria-pressed={activeExampleId === id}
+                disabled={loadingExampleId !== '' && loadingExampleId !== id}
+                onClick={blurAfterClick(() => onLoadExample(id))}
+              >
+                {loadingExampleId === id ? '…' : label}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
     </section>
   )
 }
