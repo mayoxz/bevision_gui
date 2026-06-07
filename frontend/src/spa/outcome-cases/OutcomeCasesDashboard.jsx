@@ -9,7 +9,14 @@ import {
   buildSceneComboStripChart,
   formatCasePreviewEntries,
 } from './outcomeCasesStats.js'
-import { bandsToLegendItems, getChartTheme, saveOutcomeChartPng, sortBands, STRIP_LAYOUT } from './exportChartPng.js'
+import {
+  bandsToLegendItems,
+  getChartTheme,
+  resolveStripLabelPad,
+  saveOutcomeChartPng,
+  sortBands,
+  STRIP_LAYOUT,
+} from './exportChartPng.js'
 import { detectStripClusters } from './stripChartClusters.js'
 
 const DATA_PATH = 'outcome-cases/bottom10_scene_labels.json'
@@ -154,17 +161,26 @@ function SummaryCards({ analysis, meta }) {
   )
 }
 
-function RankStripSvg({ bands, points, rankMin, rankMax, padL, field, compact = false, onDotClick }) {
+function RankStripSvg({
+  bands,
+  points,
+  rankMin,
+  rankMax,
+  labelPad,
+  plotWidth,
+  field,
+  compact = false,
+  onDotClick,
+}) {
   const theme = useMemo(() => getChartTheme(), [])
   const orderedBands = useMemo(() => sortBands(bands, field), [bands, field])
   const layout = compact ? STRIP_LAYOUT.compact : STRIP_LAYOUT.full
-  const W = layout.w
+  const W = Math.max(layout.w, plotWidth ?? 0)
   const padR = layout.padR
   const padT = layout.padT
   const bandRowH = layout.bandRowH
   const axisH = layout.axisH
   const padB = layout.padB
-  const labelPad = padL ?? layout.padL
   const bandCount = Math.max(orderedBands.length, 1)
   const innerW = W - labelPad - padR
   const innerH = bandCount * bandRowH
@@ -436,13 +452,16 @@ function DotCasePreview({ preview, onClose }) {
   )
 }
 
-function ChartAxisFooter({ padL, compact = false }) {
+function ChartAxisFooter({ labelPad, chartWidth, compact = false }) {
   const layout = compact ? STRIP_LAYOUT.compact : STRIP_LAYOUT.full
-  const leftPad = padL ?? layout.padL
+  const w = Math.max(layout.w, chartWidth ?? 0)
   return (
     <div
       className="outcome-strip-chart__axis-footer"
-      style={{ paddingLeft: `${leftPad}px`, paddingRight: `${layout.padR}px` }}
+      style={{
+        paddingLeft: `${(labelPad / w) * 100}%`,
+        paddingRight: `${(layout.padR / w) * 100}%`,
+      }}
     >
       <span>worse</span>
       <span className="outcome-strip-chart__axis-mid">Rank</span>
@@ -452,7 +471,27 @@ function ChartAxisFooter({ padL, compact = false }) {
 }
 
 function StripChartPlot({ bands, points, rankMin, rankMax, padL, field, compact = false }) {
+  const plotRef = useRef(null)
+  const [plotWidth, setPlotWidth] = useState(null)
   const [preview, setPreview] = useState(null)
+  const layout = compact ? STRIP_LAYOUT.compact : STRIP_LAYOUT.full
+  const labelPad = useMemo(
+    () => resolveStripLabelPad(bands, { compact, padL }),
+    [bands, compact, padL],
+  )
+  const chartWidth = Math.max(layout.w, plotWidth ?? 0)
+
+  useEffect(() => {
+    const el = plotRef.current
+    if (!el) return undefined
+    const update = (width) => {
+      if (width > 0) setPlotWidth(Math.round(width))
+    }
+    update(el.getBoundingClientRect().width)
+    const ro = new ResizeObserver(([entry]) => update(entry.contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   useEffect(() => {
     if (!preview) return undefined
@@ -464,13 +503,14 @@ function StripChartPlot({ bands, points, rankMin, rankMax, padL, field, compact 
   }, [preview])
 
   return (
-    <div className="outcome-strip-chart__plot">
+    <div ref={plotRef} className="outcome-strip-chart__plot">
       <RankStripSvg
         bands={bands}
         points={points}
         rankMin={rankMin}
         rankMax={rankMax}
-        padL={padL}
+        labelPad={labelPad}
+        plotWidth={plotWidth}
         field={field}
         compact={compact}
         onDotClick={(dot) => {
@@ -478,7 +518,7 @@ function StripChartPlot({ bands, points, rankMin, rankMax, padL, field, compact 
         }}
       />
       {preview ? <DotCasePreview preview={preview} onClose={() => setPreview(null)} /> : null}
-      <ChartAxisFooter padL={padL} compact={compact} />
+      <ChartAxisFooter labelPad={labelPad} chartWidth={chartWidth} compact={compact} />
     </div>
   )
 }

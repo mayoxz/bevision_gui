@@ -80,6 +80,18 @@ export const STRIP_LAYOUT = {
   compact: { w: 360, padL: 68, padR: 10, padT: 8, bandRowH: 42, axisH: 20, padB: 4 },
 }
 
+/** Left gutter wide enough for the longest band label (e.g. "Night · Raindrop"). */
+export function resolveStripLabelPad(bands, { compact = false, padL } = {}) {
+  const layout = compact ? STRIP_LAYOUT.compact : STRIP_LAYOUT.full
+  const min = padL ?? layout.padL
+  const fontSize = compact ? 11 : 12
+  const longest = (bands ?? []).reduce(
+    (max, band) => Math.max(max, String(band.display ?? '').length),
+    0,
+  )
+  return Math.max(min, Math.ceil(longest * fontSize * 0.55) + 14)
+}
+
 export function stripChartHeight(bandCount, compact = false) {
   const layout = compact ? STRIP_LAYOUT.compact : STRIP_LAYOUT.full
   return layout.padT + bandCount * layout.bandRowH + layout.axisH + layout.padB
