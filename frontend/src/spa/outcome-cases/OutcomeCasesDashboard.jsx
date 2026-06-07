@@ -4,7 +4,11 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { resolveDataUrl } from '../../config/dataUrl.js'
-import { analyzeOutcomeCases, formatCasePreviewEntries } from './outcomeCasesStats.js'
+import {
+  analyzeOutcomeCases,
+  buildSceneComboStripChart,
+  formatCasePreviewEntries,
+} from './outcomeCasesStats.js'
 import { bandsToLegendItems, getChartTheme, saveOutcomeChartPng, sortBands, STRIP_LAYOUT } from './exportChartPng.js'
 import { detectStripClusters } from './stripChartClusters.js'
 
@@ -21,6 +25,38 @@ function resolveVisualizationImageUrl(rank, imgName, kind) {
   const fileName = visualizationImageFileName(rank, imgName)
   if (!fileName) return null
   return resolveDataUrl(`${VIS_ROOT}/${kind}/${fileName}`)
+}
+
+function previewImageFileName(rank, imgName, kind) {
+  const fileName = visualizationImageFileName(rank, imgName)
+  if (!fileName) return null
+  return `${kind}_${fileName}`
+}
+
+async function downloadImage(url, fileName) {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const blob = await res.blob()
+  const blobUrl = URL.createObjectURL(blob)
+  try {
+    const anchor = document.createElement('a')
+    anchor.href = blobUrl
+    anchor.download = fileName
+    anchor.click()
+  } finally {
+    URL.revokeObjectURL(blobUrl)
+  }
+}
+
+function sceneTagsFromReference(reference) {
+  if (!reference) return []
+  if (Array.isArray(reference.scene_tags) && reference.scene_tags.length) {
+    return reference.scene_tags.filter(Boolean)
+  }
+  if (typeof reference.scene_description === 'string' && reference.scene_description.trim()) {
+    return reference.scene_description.split(',').map((tag) => tag.trim()).filter(Boolean)
+  }
+  return []
 }
 
 async function fetchSceneLabels() {
@@ -95,7 +131,7 @@ function SummaryCards({ analysis, meta }) {
         </div>
         <div className="eval-dash__metric-card">
           <span className="eval-dash__metric-label">Rank range</span>
-          <span className="eval-dash__metric-value outcome-dash__metric-value--sm">
+          <span className="eval-dash__metric-value eval-dash__metric-value--sm">
             {analysis.rankRange
               ? `${analysis.rankRange.min} – ${analysis.rankRange.max}`
               : '—'}
@@ -103,7 +139,7 @@ function SummaryCards({ analysis, meta }) {
         </div>
         <div className="eval-dash__metric-card">
           <span className="eval-dash__metric-label">Strongest signal</span>
-          <span className="eval-dash__metric-value outcome-dash__metric-value--sm">
+          <span className="eval-dash__metric-value eval-dash__metric-value--sm">
             {analysis.strongest
               ? `${analysis.strongest.label} (ρ ${fmtRho(analysis.strongest.rho)})`
               : '—'}
@@ -111,15 +147,14 @@ function SummaryCards({ analysis, meta }) {
         </div>
       </div>
       <p className="spa-view__msg spa-view__msg--sub outcome-dash__note">
-        Rank 1 = worst among bottom cases; higher rank = relatively less bad. Labels exclude{' '}
-        <code>notes</code>.
-        {meta?.model ? ` Model: ${meta.model}.` : null}
+        {meta?.model ? `API (${meta.model}), ` : 'API, '}
+        일부 수동 확인·수정.
       </p>
     </section>
   )
 }
 
-function RankStripSvg({ bands, points, rankMin, rankMax, padL, field, compact = false, onDotPress, onDotRelease }) {
+function RankStripSvg({ bands, points, rankMin, rankMax, padL, field, compact = false, onDotClick }) {
   const theme = useMemo(() => getChartTheme(), [])
   const orderedBands = useMemo(() => sortBands(bands, field), [bands, field])
   const layout = compact ? STRIP_LAYOUT.compact : STRIP_LAYOUT.full
@@ -156,6 +191,7 @@ function RankStripSvg({ bands, points, rankMin, rankMax, padL, field, compact = 
             rank: point.rank,
             imgName: point.imgName ?? null,
             rawLabels: point.rawLabels,
+            reference: point.reference ?? null,
             cx: sx(point.rank),
             cy: bandCenterY(band.index) + jitterOffset(point.id, bandRowH),
             color: band.color,
@@ -267,18 +303,14 @@ function RankStripSvg({ bands, points, rankMin, rankMax, padL, field, compact = 
         <g
           key={dot.id}
           className={`outcome-strip-chart__dot${dot.imgName ? ' outcome-strip-chart__dot--preview' : ''}`}
-          onPointerDown={
+          onClick={
             dot.imgName
               ? (event) => {
-                  if (event.button !== 0) return
-                  event.preventDefault()
-                  onDotPress?.(dot)
+                  event.stopPropagation()
+                  onDotClick?.(dot)
                 }
               : undefined
           }
-          onPointerUp={dot.imgName ? () => onDotRelease?.() : undefined}
-          onPointerCancel={dot.imgName ? () => onDotRelease?.() : undefined}
-          onPointerLeave={dot.imgName ? () => onDotRelease?.() : undefined}
         >
           <circle cx={dot.cx} cy={dot.cy} r={compact ? 7 : 8} fill="transparent" />
           <circle cx={dot.cx} cy={dot.cy} r={compact ? 2.3 : 2.8} fill={dot.color} opacity="0.52" />
@@ -306,19 +338,59 @@ function BandStatsRow({ bands, field, compact = false }) {
   )
 }
 
-function DotHoldPreview({ hold }) {
-  const { dot } = hold
+function PreviewImageFigure({ label, url, rank, imgName, kind }) {
+  const [downloading, setDownloading] = useState(false)
+  const fileName = previewImageFileName(rank, imgName, kind)
+
+  return (
+    <figure>
+      <div className="outcome-strip-chart__hold-figure-head">
+        <figcaption>{label}</figcaption>
+        {url && fileName ? (
+          <button
+            type="button"
+            className="eval-dash__export-btn outcome-strip-chart__hold-download"
+            disabled={downloading}
+            onClick={async () => {
+              setDownloading(true)
+              try {
+                await downloadImage(url, fileName)
+              } catch (err) {
+                window.alert(err?.message ?? String(err))
+              } finally {
+                setDownloading(false)
+              }
+            }}
+          >
+            {downloading ? '…' : '다운로드'}
+          </button>
+        ) : null}
+      </div>
+      {url ? <img src={url} alt="" /> : <p className="outcome-strip-chart__hold-missing">—</p>}
+    </figure>
+  )
+}
+
+function DotCasePreview({ preview, onClose }) {
+  const { dot } = preview
   const gtUrl = resolveVisualizationImageUrl(dot.rank, dot.imgName, 'ground_truth')
   const predUrl = resolveVisualizationImageUrl(dot.rank, dot.imgName, 'prediction')
   const categories = useMemo(
     () => (dot.rawLabels ? formatCasePreviewEntries(dot.rawLabels) : []),
     [dot.rawLabels],
   )
+  const sceneTags = useMemo(() => sceneTagsFromReference(dot.reference), [dot.reference])
   if (!gtUrl && !predUrl) return null
 
   return (
-    <div className="outcome-strip-chart__hold-overlay" aria-hidden>
-      <div className="outcome-strip-chart__hold-panel">
+    <div className="outcome-strip-chart__hold-overlay" onClick={onClose}>
+      <div
+        className="outcome-strip-chart__hold-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Rank ${fmtRank(dot.rank)} preview`}
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="outcome-strip-chart__hold-head">
           <div className="outcome-strip-chart__hold-rank">Rank {fmtRank(dot.rank)}</div>
           <div className="outcome-strip-chart__hold-categories">
@@ -333,16 +405,31 @@ function DotHoldPreview({ hold }) {
               </span>
             ))}
           </div>
+          {sceneTags.length ? (
+            <div className="outcome-strip-chart__hold-tags">
+              {sceneTags.map((tag) => (
+                <span key={tag} className="outcome-strip-chart__hold-tag">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="outcome-strip-chart__hold-images">
-          <figure>
-            <figcaption>Ground truth</figcaption>
-            {gtUrl ? <img src={gtUrl} alt="" /> : <p className="outcome-strip-chart__hold-missing">—</p>}
-          </figure>
-          <figure>
-            <figcaption>Prediction</figcaption>
-            {predUrl ? <img src={predUrl} alt="" /> : <p className="outcome-strip-chart__hold-missing">—</p>}
-          </figure>
+          <PreviewImageFigure
+            label="Ground truth"
+            url={gtUrl}
+            rank={dot.rank}
+            imgName={dot.imgName}
+            kind="ground_truth"
+          />
+          <PreviewImageFigure
+            label="Prediction"
+            url={predUrl}
+            rank={dot.rank}
+            imgName={dot.imgName}
+            kind="prediction"
+          />
         </div>
       </div>
     </div>
@@ -365,18 +452,16 @@ function ChartAxisFooter({ padL, compact = false }) {
 }
 
 function StripChartPlot({ bands, points, rankMin, rankMax, padL, field, compact = false }) {
-  const [hold, setHold] = useState(null)
+  const [preview, setPreview] = useState(null)
 
   useEffect(() => {
-    if (!hold) return undefined
-    const release = () => setHold(null)
-    window.addEventListener('pointerup', release)
-    window.addEventListener('pointercancel', release)
-    return () => {
-      window.removeEventListener('pointerup', release)
-      window.removeEventListener('pointercancel', release)
+    if (!preview) return undefined
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setPreview(null)
     }
-  }, [hold])
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [preview])
 
   return (
     <div className="outcome-strip-chart__plot">
@@ -388,18 +473,17 @@ function StripChartPlot({ bands, points, rankMin, rankMax, padL, field, compact 
         padL={padL}
         field={field}
         compact={compact}
-        onDotPress={(dot) => {
-          if (dot.imgName) setHold({ dot })
+        onDotClick={(dot) => {
+          if (dot.imgName) setPreview({ dot })
         }}
-        onDotRelease={() => setHold(null)}
       />
-      {hold ? <DotHoldPreview hold={hold} /> : null}
+      {preview ? <DotCasePreview preview={preview} onClose={() => setPreview(null)} /> : null}
       <ChartAxisFooter padL={padL} compact={compact} />
     </div>
   )
 }
 
-function CategoryRankStripChart({ chart, rankMin, rankMax }) {
+function CategoryRankStripChart({ chart, rankMin, rankMax, controls = null }) {
   const chartRef = useRef(null)
 
   return (
@@ -410,9 +494,7 @@ function CategoryRankStripChart({ chart, rankMin, rankMax }) {
             {chart.label}
             <span className="outcome-dash__rho">ρ {fmtRho(chart.rho)}</span>
           </h3>
-          <p className="outcome-dash__chart-caption">
-            Each dot = one case. Dashed vertical line = median rank. Dashed circle = isolated pocket in an otherwise sparse rank range.
-          </p>
+          {controls}
         </div>
         <ChartExportButton
           onExport={async () => {
@@ -446,136 +528,42 @@ function CategoryRankStripChart({ chart, rankMin, rankMax }) {
   )
 }
 
-function TwoWayFacetStripChart({ chart, rankMin, rankMax }) {
-  const blockRef = useRef(null)
+function SceneComboRankStripChart({ rows, rankMin, rankMax }) {
+  const [splitNight, setSplitNight] = useState(false)
+  const chart = useMemo(() => buildSceneComboStripChart(rows, splitNight), [rows, splitNight])
 
   return (
-    <div className="outcome-dash__block">
-      <div className="outcome-dash__chart-head outcome-dash__chart-head--export">
-        <div>
-          <h3 className="outcome-dash__h3">{chart.title}</h3>
-          <p className="outcome-dash__chart-caption">
-            Panels split by second label. Each panel shows rank distribution across the first label.
-          </p>
-        </div>
-        <ChartExportButton
-          onExport={async () => {
-            const svgs = [...(blockRef.current?.querySelectorAll('.outcome-twoway-panel svg') ?? [])]
-            const panels = chart.panels
-              .map((panel, index) => {
-                const svg = svgs[index]
-                if (!(svg instanceof SVGSVGElement)) return null
-                return {
-                  svg,
-                  subtitle: `${panel.display} (n=${panel.n})`,
-                  legendItems: bandsToLegendItems(panel.bands, chart.fieldA),
-                  legendField: chart.fieldA,
-                }
-              })
-              .filter(Boolean)
-            if (!panels.length) throw new Error('Chart not found')
-            await saveOutcomeChartPng({
-              title: chart.title,
-              panels,
-            })
-          }}
-        />
-      </div>
-      <div ref={blockRef} className="outcome-twoway-grid">
-        {chart.panels.map((panel) => (
-          <div
-            key={String(panel.value)}
-            className="smoke-chart outcome-strip-chart outcome-twoway-panel"
-            style={{ '--panel-accent': panel.accent }}
-          >
-            <div className="outcome-twoway-panel__head">
-              <span className="outcome-twoway-panel__swatch" style={{ background: panel.accent }} />
-              <span className="outcome-twoway-panel__title">{panel.display}</span>
-              <span className="outcome-twoway-panel__count">n={panel.n}</span>
-            </div>
-            <BandStatsRow bands={panel.bands} field={chart.fieldA} compact />
-            <StripChartPlot
-              bands={panel.bands}
-              points={panel.points}
-              rankMin={rankMin}
-              rankMax={rankMax}
-              padL={chart.padL}
-              field={chart.fieldA}
-              compact
-            />
-          </div>
-        ))}
-      </div>
-    </div>
+    <CategoryRankStripChart
+      chart={chart}
+      rankMin={rankMin}
+      rankMax={rankMax}
+      controls={
+        <label className="outcome-dash__toggle">
+          <input
+            type="checkbox"
+            checked={splitNight}
+            onChange={(event) => setSplitNight(event.target.checked)}
+          />
+          <span>Night clear/raindrop 분리</span>
+        </label>
+      }
+    />
   )
 }
 
-function DistributionSection({ stripCharts, rankRange }) {
-  if (!stripCharts.length || !rankRange) return null
+function DistributionSection({ stripCharts, rows, rankRange }) {
+  if (!stripCharts.length || !rankRange || !rows?.length) return null
+  const lightingChart = stripCharts[0]
+
   return (
     <section className="eval-dash__section">
       <h2 className="eval-dash__h2">등수 분포</h2>
-      <p className="spa-view__msg spa-view__msg--sub outcome-dash__note">
-        Each point is one case. Compare how label values spread across ranks.
-      </p>
-      {stripCharts.map((chart) => (
-        <CategoryRankStripChart
-          key={chart.field}
-          chart={chart}
-          rankMin={rankRange.min}
-          rankMax={rankRange.max}
-        />
-      ))}
-    </section>
-  )
-}
-
-function TwoWaySection({ twoWayStripCharts, rankRange }) {
-  if (!twoWayStripCharts.length || !rankRange) return null
-  return (
-    <section className="eval-dash__section">
-      <h2 className="eval-dash__h2">2-way 조합</h2>
-      <p className="spa-view__msg spa-view__msg--sub outcome-dash__note">
-        Split by the second label; compare rank spread within each panel.
-      </p>
-      {twoWayStripCharts.map((chart) => (
-        <TwoWayFacetStripChart
-          key={`${chart.fieldA}-${chart.fieldB}`}
-          chart={chart}
-          rankMin={rankRange.min}
-          rankMax={rankRange.max}
-        />
-      ))}
-    </section>
-  )
-}
-
-function FullComboSection({ fullCombos }) {
-  return (
-    <section className="eval-dash__section">
-      <h2 className="eval-dash__h2">4-label 조합 (n ≥ 10)</h2>
-      <div className="eval-dash__table-wrap">
-        <table className="eval-dash__table">
-          <thead>
-            <tr>
-              <th>Combination</th>
-              <th className="eval-dash__td-num">n</th>
-              <th className="eval-dash__td-num">평균 등수</th>
-              <th className="eval-dash__td-num">중앙 등수</th>
-            </tr>
-          </thead>
-          <tbody>
-            {fullCombos.map((combo) => (
-              <tr key={combo.key}>
-                <td>{combo.labelText}</td>
-                <td className="eval-dash__td-num">{combo.n}</td>
-                <td className="eval-dash__td-num">{fmtRank(combo.meanRank)}</td>
-                <td className="eval-dash__td-num">{fmtRank(combo.medianRank)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <CategoryRankStripChart
+        chart={lightingChart}
+        rankMin={rankRange.min}
+        rankMax={rankRange.max}
+      />
+      <SceneComboRankStripChart rows={rows} rankMin={rankRange.min} rankMax={rankRange.max} />
     </section>
   )
 }
@@ -624,9 +612,11 @@ export default function OutcomeCasesDashboard() {
   return (
     <div className="eval-dashboard outcome-dashboard">
       <SummaryCards analysis={analysis} meta={payload?.meta} />
-      <DistributionSection stripCharts={analysis.stripCharts} rankRange={analysis.rankRange} />
-      <TwoWaySection twoWayStripCharts={analysis.twoWayStripCharts} rankRange={analysis.rankRange} />
-      <FullComboSection fullCombos={analysis.fullCombos} />
+      <DistributionSection
+        stripCharts={analysis.stripCharts}
+        rows={analysis.rows}
+        rankRange={analysis.rankRange}
+      />
     </div>
   )
 }
