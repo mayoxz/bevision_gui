@@ -6,7 +6,7 @@ export const COMPARE_LEGEND_ITEMS = [
   { traceIndex: ROOM_TRACE_COUNT + 2, name: 'Missed GT', kind: 'line', color: '#e53935' },
   { traceIndex: ROOM_TRACE_COUNT + 3, name: 'Matched prediction', kind: 'line', color: '#1787d4' },
   { traceIndex: ROOM_TRACE_COUNT + 4, name: 'False prediction', kind: 'line', color: '#ff9800' },
-  { traceIndex: ROOM_TRACE_COUNT + 5, name: 'Ego', kind: 'marker', color: '#000000' },
+  { traceIndex: ROOM_TRACE_COUNT + 5, name: 'Ego', kind: 'marker', color: '#9c27b0' },
 ]
 
 export function createLegendVisibility() {

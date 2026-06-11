@@ -9,6 +9,8 @@ import {
 const DATA_ROOT = 'basemodel-vs-bevision'
 /** basemodel.html export default; scatter3d renders thicker on high-DPR displays. */
 const POINTCLOUD_MARKER_EXPORT_PX = 1.2
+const EGO_MARKER_EXPORT_PX = 2.5
+const EGO_MARKER_COLOR = '#9c27b0'
 
 const HIDDEN_SCENE_AXIS = {
   showgrid: false,
@@ -47,14 +49,24 @@ function normalizeTrace(trace) {
   return next
 }
 
-function pointcloudMarkerSize() {
+function scatter3dMarkerCssPx(exportedPx) {
   const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1
-  return POINTCLOUD_MARKER_EXPORT_PX / dpr
+  return exportedPx / dpr
 }
 
 function normalizePointcloudTrace(trace) {
   const next = normalizeTrace(trace)
-  next.marker = { ...next.marker, size: pointcloudMarkerSize() }
+  next.marker = { ...next.marker, size: scatter3dMarkerCssPx(POINTCLOUD_MARKER_EXPORT_PX) }
+  return next
+}
+
+function normalizeEgoTrace(trace) {
+  const next = normalizeTrace(trace)
+  next.marker = {
+    ...next.marker,
+    size: scatter3dMarkerCssPx(EGO_MARKER_EXPORT_PX),
+    color: EGO_MARKER_COLOR,
+  }
   return next
 }
 
@@ -64,7 +76,7 @@ export function buildFigureTraces(shared, model) {
     normalizePointcloudTrace(shared.pointcloud),
     ...model.bboxTraces.map(normalizeTrace),
     normalizeTrace(shared.falsePred),
-    normalizeTrace(shared.ego),
+    normalizeEgoTrace(shared.ego),
     buildSceneLabelTrace(),
   ]
 }

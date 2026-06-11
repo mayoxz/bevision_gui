@@ -18,10 +18,31 @@ const PLOT_CONFIG = {
   doubleClick: false,
 }
 
-function ComparePanel({ label, plotRef, legend }) {
+function SceneBar({ scenes, sceneId, loading, onSelect }) {
+  if (!scenes.length) return null
+
+  return (
+    <div className="bm-bev-compare__scene-bar" role="toolbar" aria-label="Scene selection">
+      {scenes.map((scene) => (
+        <button
+          key={scene.id}
+          type="button"
+          className={`bm-bev-compare__scene-btn${scene.id === sceneId ? ' bm-bev-compare__scene-btn--active' : ''}`}
+          onClick={() => onSelect(scene.id)}
+          disabled={loading && scene.id === sceneId}
+        >
+          {scene.label ?? `Scene ${scene.id}`}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ComparePanel({ label, plotRef, legend, sceneBar }) {
   return (
     <section className="bm-bev-compare__panel">
       {legend}
+      {sceneBar}
       <div className="bm-bev-compare__label">{label}</div>
       <div ref={plotRef} className="bm-bev-compare__plot" />
     </section>
@@ -172,21 +193,6 @@ export default function BasemodelVsBevisionDashboard() {
 
   return (
     <div ref={rootRef} className="bm-bev-compare">
-      {scenes.length > 0 ? (
-        <div className="bm-bev-compare__scene-bar" role="toolbar" aria-label="Scene selection">
-          {scenes.map((scene) => (
-            <button
-              key={scene.id}
-              type="button"
-              className={`bm-bev-compare__scene-btn${scene.id === sceneId ? ' bm-bev-compare__scene-btn--active' : ''}`}
-              onClick={() => setSceneId(scene.id)}
-              disabled={loading && scene.id === sceneId}
-            >
-              {scene.label ?? `Scene ${scene.id}`}
-            </button>
-          ))}
-        </div>
-      ) : null}
       {loading ? <p className="bm-bev-compare__status">Loading comparison…</p> : null}
       {error ? <p className="bm-bev-compare__error">{error}</p> : null}
       <div className="bm-bev-compare__grid">
@@ -194,6 +200,14 @@ export default function BasemodelVsBevisionDashboard() {
           label="Basemodel"
           plotRef={leftRef}
           legend={<CompareLegend visibility={legendVisibility} onToggle={toggleLegendItem} />}
+          sceneBar={(
+            <SceneBar
+              scenes={scenes}
+              sceneId={sceneId}
+              loading={loading}
+              onSelect={setSceneId}
+            />
+          )}
         />
         <ComparePanel
           label="BEVision"
