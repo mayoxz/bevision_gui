@@ -6,11 +6,12 @@ const lazyRoutes = {
   'nuscenes:eval': lazy(() => import('../spa/nuscenes-eval/index.jsx')),
   'epoch-logs': lazy(() => import('../spa/epoch-logs/index.jsx')),
   'outcome-cases': lazy(() => import('../spa/outcome-cases/index.jsx')),
+  'basemodel-vs-bevision': lazy(() => import('../spa/basemodel-vs-bevision/index.jsx')),
 }
 
 export function SpaViewport({ dataset, runKind }) {
   const routeKey =
-    dataset === 'epoch-logs' || dataset === 'outcome-cases'
+    dataset === 'epoch-logs' || dataset === 'outcome-cases' || dataset === 'basemodel-vs-bevision'
       ? dataset
       : `${dataset}:${runKind}`
   const LazyComp = lazyRoutes[routeKey] ?? null

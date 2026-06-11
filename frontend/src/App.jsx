@@ -9,6 +9,7 @@ import { usePointcloudController } from './spa/pointcloud-viewer/usePointcloudCo
 export default function App() {
   const [activeView, setActiveView] = useState(DEFAULT_VIEW)
   const isPointcloud = activeView === 'pointcloud'
+  const isFullBleed = activeView === 'basemodel-vs-bevision'
   const { dataset, runKind } = parseViewId(activeView)
   const pointcloud = usePointcloudController(isPointcloud)
 
@@ -28,7 +29,7 @@ export default function App() {
         <main className="app-main">
           <div
             id="viz-root"
-            className={`app-workspace${isPointcloud ? ' app-workspace--pointcloud' : ''}`}
+            className={`app-workspace${isPointcloud ? ' app-workspace--pointcloud' : ''}${isFullBleed ? ' app-workspace--fullbleed' : ''}`}
             aria-label="시각화 영역"
           >
             {isPointcloud ? (

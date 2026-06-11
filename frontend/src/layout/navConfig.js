@@ -1,4 +1,5 @@
 export const NAV_ITEMS = [
+  { id: 'basemodel-vs-bevision', label: 'Basemodel vs BEVision', section: 'dashboard' },
   { id: 'outcome-cases', label: 'Outcome cases', section: 'dashboard' },
   { id: 'nus-mini:eval', label: 'NuScenes-mini · eval', section: 'dashboard' },
   { id: 'nus-mini:smoke', label: 'NuScenes-mini · smoke', section: 'dashboard' },
@@ -15,6 +16,9 @@ export const NAV_ITEMS = [
 ]
 
 export function parseViewId(viewId) {
+  if (viewId === 'basemodel-vs-bevision') {
+    return { dataset: 'basemodel-vs-bevision', runKind: 'eval' }
+  }
   if (viewId === 'epoch-logs') {
     return { dataset: 'epoch-logs', runKind: 'eval' }
   }
@@ -28,4 +32,4 @@ export function parseViewId(viewId) {
   return { dataset, runKind: runKind ?? 'eval' }
 }
 
-export const DEFAULT_VIEW = 'epoch-logs'
+export const DEFAULT_VIEW = 'basemodel-vs-bevision'

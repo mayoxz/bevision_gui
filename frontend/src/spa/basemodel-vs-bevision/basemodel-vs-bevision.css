@@ -1,0 +1,124 @@
+.bm-bev-compare {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.bm-bev-compare__status,
+.bm-bev-compare__error {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  margin: 0;
+  font-size: 13px;
+}
+
+.bm-bev-compare__error {
+  color: #e53935;
+}
+
+.bm-bev-compare__grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  overflow: hidden;
+}
+
+.bm-bev-compare__panel {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+}
+
+.bm-bev-compare__panel:last-child {
+  border-right: none;
+}
+
+.bm-bev-compare__label {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  left: auto;
+  z-index: 2;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-h);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  border: 1px solid var(--border);
+  pointer-events: none;
+}
+
+.bm-bev-compare__plot {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  background: #fff;
+  overflow: hidden;
+}
+
+.bm-bev-compare__plot .svg-container,
+.bm-bev-compare__plot .main-svg {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.bm-bev-compare__legend {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.bm-bev-compare__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #111111;
+  font-size: 12px;
+  line-height: 1.2;
+  cursor: pointer;
+  text-align: left;
+}
+
+.bm-bev-compare__legend-item--off {
+  opacity: 0.4;
+}
+
+.bm-bev-compare__legend-swatch {
+  flex-shrink: 0;
+  background: var(--legend-color);
+}
+
+.bm-bev-compare__legend-swatch--line {
+  width: 18px;
+  height: 3px;
+  border-radius: 1px;
+}
+
+.bm-bev-compare__legend-swatch--marker {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}

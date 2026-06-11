@@ -103,6 +103,14 @@ body {
   color: var(--text);
 }
 
+.spa-view--basemodel-vs-bevision {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .spa-view__title {
   font-family: var(--heading);
   font-size: 18px;
