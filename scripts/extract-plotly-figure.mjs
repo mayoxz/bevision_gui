@@ -85,13 +85,45 @@ function solidLineTraces(traces) {
   })
 }
 
+function sceneLabel(sceneId) {
+  return `Scene ${sceneId}`
+}
+
+function updateSceneIndex(indexPath, sceneId, label) {
+  let index = { defaultScene: sceneId, scenes: [] }
+  if (fs.existsSync(indexPath)) {
+    index = JSON.parse(fs.readFileSync(indexPath, 'utf8'))
+  }
+  if (!Array.isArray(index.scenes)) index.scenes = []
+
+  const nextLabel = label ?? sceneLabel(sceneId)
+  const existing = index.scenes.find((scene) => scene.id === sceneId)
+  if (existing) {
+    existing.label = nextLabel
+  } else {
+    index.scenes.push({ id: sceneId, label: nextLabel })
+    index.scenes.sort((a, b) => a.id.localeCompare(b.id))
+  }
+  if (!index.defaultScene) index.defaultScene = sceneId
+
+  fs.writeFileSync(indexPath, `${JSON.stringify(index, null, 2)}\n`)
+}
+
+const sceneId = process.argv[2] ?? '01'
+if (!/^\d{2}$/.test(sceneId)) {
+  throw new Error(`Scene id must be two digits (e.g. 01), got "${sceneId}"`)
+}
+
+const sceneLabelArg = process.argv[3]
+
 const sources = [
   { file: 'd:/Downloads/basemodel.html', key: 'basemodel' },
   { file: 'd:/Downloads/bevision.html', key: 'bevision' },
 ]
 
-const outDir = path.resolve('frontend/public/data/basemodel-vs-bevision')
-fs.mkdirSync(outDir, { recursive: true })
+const dataRoot = path.resolve('frontend/public/data/basemodel-vs-bevision')
+const sceneDir = path.join(dataRoot, 'scenes', sceneId)
+fs.mkdirSync(sceneDir, { recursive: true })
 
 const extracted = Object.fromEntries(
   sources.map(({ file, key }) => {
@@ -101,7 +133,6 @@ const extracted = Object.fromEntries(
 )
 
 const baseFigure = extracted.basemodel.figure
-const bevFigure = extracted.bevision.figure
 
 const sharedPayload = {
   layout: zeroLayoutPadding(baseFigure.layout),
@@ -113,7 +144,7 @@ const sharedPayload = {
 for (const key of ['basemodel', 'bevision']) {
   const { bundle } = extracted[key]
   fs.writeFileSync(
-    path.join(outDir, `${key}.json`),
+    path.join(sceneDir, `${key}.json`),
     JSON.stringify({
       label: bundle.label,
       title: bundle.title,
@@ -122,9 +153,11 @@ for (const key of ['basemodel', 'bevision']) {
   )
 }
 
-fs.writeFileSync(path.join(outDir, 'shared.json'), JSON.stringify(sharedPayload))
+fs.writeFileSync(path.join(sceneDir, 'shared.json'), JSON.stringify(sharedPayload))
+updateSceneIndex(path.join(dataRoot, 'scenes', 'index.json'), sceneId, sceneLabelArg)
 
-console.log('Wrote', outDir)
+console.log('Wrote', sceneDir)
+console.log(`  scene ${sceneId}`)
 console.log('  shared.json (layout + pointcloud + ego + false prediction)')
 console.log('  basemodel.json (bbox traces)')
 console.log('  bevision.json (bbox traces)')

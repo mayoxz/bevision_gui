@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import CompareLegend from './CompareLegend.jsx'
 import { createLegendVisibility, setTraceVisibility } from './compareLegend.js'
-import { buildFigureLayout, buildFigureTraces, fetchCompareFigures } from './figureData.js'
+import {
+  buildFigureLayout,
+  buildFigureTraces,
+  fetchCompareFigures,
+  fetchCompareSceneIndex,
+} from './figureData.js'
 import { loadPlotly } from './loadPlotly.js'
 import { bindMirroredPlotlyCameras } from './syncPlotlyCameras.js'
 import './basemodel-vs-bevision.css'
@@ -27,6 +32,8 @@ export default function BasemodelVsBevisionDashboard() {
   const leftRef = useRef(null)
   const rightRef = useRef(null)
   const rootRef = useRef(null)
+  const [scenes, setScenes] = useState([])
+  const [sceneId, setSceneId] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
   const [legendVisibility, setLegendVisibility] = useState(createLegendVisibility)
@@ -45,18 +52,42 @@ export default function BasemodelVsBevisionDashboard() {
 
   useEffect(() => {
     let cancelled = false
+
+    fetchCompareSceneIndex()
+      .then(({ scenes: nextScenes, defaultScene }) => {
+        if (cancelled) return
+        setScenes(nextScenes)
+        setSceneId(defaultScene)
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err?.message ?? String(err))
+          setLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!sceneId) return
+
+    let cancelled = false
     let unbindMirror = null
     let resizeObserver = null
     let onLogCamera = null
     let resizeFrame = 0
     let Plotly = null
 
-    async function mount() {
+    async function mountScene() {
       setLoading(true)
       setError(null)
+      setLegendVisibility(createLegendVisibility())
       try {
         const [{ shared, basemodel, bevision }, plotly] = await Promise.all([
-          fetchCompareFigures(),
+          fetchCompareFigures(sceneId),
           loadPlotly(),
         ])
         if (cancelled) return
@@ -67,6 +98,10 @@ export default function BasemodelVsBevisionDashboard() {
         const rightEl = rightRef.current
         if (!leftEl || !rightEl) return
         plotElsRef.current = [leftEl, rightEl]
+
+        if (leftEl.data) Plotly.purge(leftEl)
+        if (rightEl.data) Plotly.purge(rightEl)
+        if (cancelled) return
 
         const leftLayout = buildFigureLayout(shared)
         const rightLayout = buildFigureLayout(shared)
@@ -120,7 +155,7 @@ export default function BasemodelVsBevisionDashboard() {
       }
     }
 
-    mount()
+    mountScene()
 
     return () => {
       cancelled = true
@@ -133,10 +168,25 @@ export default function BasemodelVsBevisionDashboard() {
         if (rightRef.current) Plotly.purge(rightRef.current)
       }
     }
-  }, [])
+  }, [sceneId])
 
   return (
     <div ref={rootRef} className="bm-bev-compare">
+      {scenes.length > 0 ? (
+        <div className="bm-bev-compare__scene-bar" role="toolbar" aria-label="Scene selection">
+          {scenes.map((scene) => (
+            <button
+              key={scene.id}
+              type="button"
+              className={`bm-bev-compare__scene-btn${scene.id === sceneId ? ' bm-bev-compare__scene-btn--active' : ''}`}
+              onClick={() => setSceneId(scene.id)}
+              disabled={loading && scene.id === sceneId}
+            >
+              {scene.label ?? `Scene ${scene.id}`}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {loading ? <p className="bm-bev-compare__status">Loading comparison…</p> : null}
       {error ? <p className="bm-bev-compare__error">{error}</p> : null}
       <div className="bm-bev-compare__grid">

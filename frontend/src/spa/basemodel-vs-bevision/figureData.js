@@ -96,11 +96,23 @@ export function buildFigureLayout(shared) {
   return layout
 }
 
-export async function fetchCompareFigures() {
+function sceneDir(sceneId) {
+  return `${DATA_ROOT}/scenes/${sceneId}`
+}
+
+export async function fetchCompareSceneIndex() {
+  const index = await fetchJson(`${DATA_ROOT}/scenes/index.json`)
+  const scenes = Array.isArray(index.scenes) ? index.scenes : []
+  const defaultScene = index.defaultScene ?? scenes[0]?.id ?? '01'
+  return { scenes, defaultScene }
+}
+
+export async function fetchCompareFigures(sceneId) {
+  const root = sceneDir(sceneId)
   const [shared, basemodel, bevision] = await Promise.all([
-    fetchJson(`${DATA_ROOT}/shared.json`),
-    fetchJson(`${DATA_ROOT}/basemodel.json`),
-    fetchJson(`${DATA_ROOT}/bevision.json`),
+    fetchJson(`${root}/shared.json`),
+    fetchJson(`${root}/basemodel.json`),
+    fetchJson(`${root}/bevision.json`),
   ])
-  return { shared, basemodel, bevision }
+  return { sceneId, shared, basemodel, bevision }
 }

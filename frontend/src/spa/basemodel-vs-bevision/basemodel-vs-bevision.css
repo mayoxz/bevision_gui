@@ -7,6 +7,47 @@
   overflow: hidden;
 }
 
+.bm-bev-compare__scene-bar {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.bm-bev-compare__scene-btn {
+  min-width: 72px;
+  padding: 4px 12px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-h);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bm-bev-compare__scene-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--bg) 70%, var(--text-h) 8%);
+}
+
+.bm-bev-compare__scene-btn--active {
+  border-color: var(--border);
+  background: #fff;
+}
+
+.bm-bev-compare__scene-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 .bm-bev-compare__status,
 .bm-bev-compare__error {
   position: absolute;
