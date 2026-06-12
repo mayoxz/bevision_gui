@@ -1,5 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import CameraCarousel from './CameraCarousel.jsx'
+import CameraLightbox from './CameraLightbox.jsx'
 import CompareLegend from './CompareLegend.jsx'
+import { buildSceneCameraImages, DEFAULT_CAMERA_CENTER_INDEX, preloadCameraImages, stepCameraIndex } from './cameraData.js'
 import { createLegendVisibility, setTraceVisibility } from './compareLegend.js'
 import {
   buildFigureLayout,
@@ -38,13 +41,21 @@ function SceneBar({ scenes, sceneId, loading, onSelect }) {
   )
 }
 
-function ComparePanel({ label, plotRef, legend, sceneBar }) {
+function ComparePanel({ label, plotRef, legend, sceneBar, cameras, carouselCenter, onCarouselCenter, onCameraDoubleClick }) {
   return (
     <section className="bm-bev-compare__panel">
       {legend}
-      {sceneBar}
-      <div className="bm-bev-compare__label">{label}</div>
-      <div ref={plotRef} className="bm-bev-compare__plot" />
+      <div className="bm-bev-compare__plot-wrap">
+        {sceneBar}
+        <div className="bm-bev-compare__label">{label}</div>
+        <div ref={plotRef} className="bm-bev-compare__plot" />
+      </div>
+      <CameraCarousel
+        cameras={cameras}
+        centerIndex={carouselCenter}
+        onCenterChange={onCarouselCenter}
+        onCameraDoubleClick={onCameraDoubleClick}
+      />
     </section>
   )
 }
@@ -58,8 +69,34 @@ export default function BasemodelVsBevisionDashboard() {
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
   const [legendVisibility, setLegendVisibility] = useState(createLegendVisibility)
+  const [carouselCenter, setCarouselCenter] = useState(DEFAULT_CAMERA_CENTER_INDEX)
+  const [lightboxCameraIndex, setLightboxCameraIndex] = useState(null)
   const plotlyRef = useRef(null)
   const plotElsRef = useRef([])
+
+  const basemodelCameras = useMemo(
+    () => (sceneId ? buildSceneCameraImages(sceneId, 'basemodel') : []),
+    [sceneId],
+  )
+  const bevisionCameras = useMemo(
+    () => (sceneId ? buildSceneCameraImages(sceneId, 'bevision') : []),
+    [sceneId],
+  )
+
+  const openCameraLightbox = useCallback((cameraIndex) => {
+    setLightboxCameraIndex(cameraIndex)
+  }, [])
+
+  const closeCameraLightbox = useCallback(() => {
+    setLightboxCameraIndex(null)
+  }, [])
+
+  const stepLightboxCamera = useCallback((delta) => {
+    setLightboxCameraIndex((index) => {
+      if (index == null || basemodelCameras.length < 1) return index
+      return stepCameraIndex(index, delta, basemodelCameras.length)
+    })
+  }, [basemodelCameras.length])
 
   const toggleLegendItem = useCallback(async (traceIndex) => {
     const Plotly = plotlyRef.current
@@ -91,6 +128,16 @@ export default function BasemodelVsBevisionDashboard() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    setCarouselCenter(DEFAULT_CAMERA_CENTER_INDEX)
+    setLightboxCameraIndex(null)
+  }, [sceneId])
+
+  useEffect(() => {
+    preloadCameraImages(basemodelCameras)
+    preloadCameraImages(bevisionCameras)
+  }, [basemodelCameras, bevisionCameras])
 
   useEffect(() => {
     if (!sceneId) return
@@ -208,13 +255,29 @@ export default function BasemodelVsBevisionDashboard() {
               onSelect={setSceneId}
             />
           )}
+          cameras={basemodelCameras}
+          carouselCenter={carouselCenter}
+          onCarouselCenter={setCarouselCenter}
+          onCameraDoubleClick={openCameraLightbox}
         />
         <ComparePanel
           label="BEVision"
           plotRef={rightRef}
           legend={<CompareLegend visibility={legendVisibility} onToggle={toggleLegendItem} />}
+          cameras={bevisionCameras}
+          carouselCenter={carouselCenter}
+          onCarouselCenter={setCarouselCenter}
+          onCameraDoubleClick={openCameraLightbox}
         />
       </div>
+      {lightboxCameraIndex != null && basemodelCameras[lightboxCameraIndex] && bevisionCameras[lightboxCameraIndex] ? (
+        <CameraLightbox
+          basemodelCamera={basemodelCameras[lightboxCameraIndex]}
+          bevisionCamera={bevisionCameras[lightboxCameraIndex]}
+          onClose={closeCameraLightbox}
+          onStepCamera={stepLightboxCamera}
+        />
+      ) : null}
     </div>
   )
 }

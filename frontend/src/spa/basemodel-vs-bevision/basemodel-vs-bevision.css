@@ -1,10 +1,21 @@
 .bm-bev-compare {
+  --camera-viewer-bg: #ebebeb;
+  --camera-viewer-bg-strong: #e4e4e4;
+  --camera-nav-width: 32px;
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   position: relative;
   overflow: hidden;
+}
+
+.bm-bev-compare__plot-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .bm-bev-compare__scene-bar {
@@ -162,4 +173,275 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
+}
+
+.bm-bev-compare__cameras {
+  position: relative;
+  flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  border-top: 1px solid var(--border);
+  background: var(--camera-viewer-bg);
+}
+
+.bm-bev-compare__cameras-strip {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  width: 100%;
+  height: var(--strip-height, auto);
+  overflow: hidden;
+  background: var(--camera-viewer-bg);
+  align-items: stretch;
+}
+
+.bm-bev-compare__cameras-nav {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--camera-nav-width);
+  padding: 0;
+  border: 0;
+  background: color-mix(in srgb, var(--camera-viewer-bg-strong) 88%, transparent);
+  color: #111111;
+  cursor: pointer;
+}
+
+.bm-bev-compare__cameras-nav-icon {
+  width: 26px;
+  height: 26px;
+  display: block;
+}
+
+.bm-bev-compare__cameras-nav:hover {
+  background: var(--camera-viewer-bg-strong);
+}
+
+.bm-bev-compare__cameras-nav--prev {
+  left: 0;
+}
+
+.bm-bev-compare__cameras-nav--next {
+  right: 0;
+}
+
+.bm-bev-compare__camera {
+  margin: 0;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: hidden;
+  cursor: zoom-in;
+}
+
+.bm-bev-compare__camera--warp {
+  position: relative;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.bm-bev-compare__camera-warp {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.bm-bev-compare__camera--center {
+  position: relative;
+}
+
+.bm-bev-compare__camera-direction {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(100% * var(--camera-bottom-band-ratio));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  background: var(--camera-viewer-bg);
+  color: #333333;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-top: 1px solid var(--border);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.bm-bev-compare__camera img {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--camera-viewer-bg);
+  border: 0;
+}
+
+.bm-bev-compare__camera-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.bm-bev-compare__camera-lightbox-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: calc(58vh + 44px);
+  overflow: hidden;
+  border-radius: 0;
+  background: var(--camera-viewer-bg);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.bm-bev-compare__camera-lightbox-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--camera-viewer-bg-strong);
+}
+
+.bm-bev-compare__camera-lightbox-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #222222;
+}
+
+.bm-bev-compare__camera-lightbox-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #444444;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.bm-bev-compare__camera-lightbox-close:hover {
+  background: color-mix(in srgb, var(--camera-viewer-bg-strong) 70%, #000000 8%);
+}
+
+.bm-bev-compare__camera-lightbox-body {
+  display: grid;
+  grid-template-columns: var(--camera-nav-width) minmax(0, 1fr) var(--camera-nav-width);
+  align-items: stretch;
+  flex: 0 0 auto;
+}
+
+.bm-bev-compare__camera-lightbox-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--camera-nav-width);
+  padding: 0;
+  border: 0;
+  background: var(--camera-viewer-bg-strong);
+  color: #111111;
+  cursor: pointer;
+}
+
+.bm-bev-compare__camera-lightbox-nav:hover {
+  background: color-mix(in srgb, var(--camera-viewer-bg-strong) 88%, #000000 8%);
+}
+
+.bm-bev-compare__camera-lightbox-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  height: min(calc((100vw - 2 * var(--camera-nav-width)) * 9 / 32), 58vh);
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.bm-bev-compare__camera-lightbox-item {
+  display: flex;
+  margin: 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.bm-bev-compare__camera-lightbox-item + .bm-bev-compare__camera-lightbox-item {
+  border-left: 1px solid var(--border);
+}
+
+.bm-bev-compare__camera-lightbox-media {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+  background: var(--camera-viewer-bg);
+  cursor: default;
+  touch-action: none;
+}
+
+.bm-bev-compare__camera-lightbox-media--pannable {
+  cursor: grab;
+}
+
+.bm-bev-compare__camera-lightbox-media--dragging {
+  cursor: grabbing;
+}
+
+.bm-bev-compare__camera-lightbox-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.bm-bev-compare__camera-lightbox-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 1;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--camera-viewer-bg) 88%, white);
+  color: #444444;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.bm-bev-compare__camera-lightbox-stage img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: var(--camera-viewer-bg);
+  user-select: none;
 }
