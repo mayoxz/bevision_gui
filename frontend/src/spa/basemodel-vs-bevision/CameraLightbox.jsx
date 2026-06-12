@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import CameraNavArrow from './CameraNavArrow.jsx'
 import ZoomPanMedia from './ZoomPanMedia.jsx'
 
-const INITIAL_ZOOM_VIEW = { panX: 0, panY: 0, scale: 1 }
+const INITIAL_ZOOM_VIEW = { scale: 1, panU: 0, panV: 0 }
 
 export default function CameraLightbox({
   basemodelCamera,
@@ -37,7 +37,7 @@ export default function CameraLightbox({
   }, [onClose, onStepCamera])
 
   const label = basemodelCamera?.label ?? bevisionCamera?.label ?? 'Camera'
-  const resetView = () => setView(INITIAL_ZOOM_VIEW)
+  const resetView = useCallback(() => setView(INITIAL_ZOOM_VIEW), [])
 
   return (
     <div

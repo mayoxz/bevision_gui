@@ -24,9 +24,18 @@ function clampAxis(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
 
+function toPixelPan(view, fit) {
+  return {
+    panX: view.panU * fit.width,
+    panY: view.panV * fit.height,
+  }
+}
+
 /** Keep pan inside bounds; at 1x lock pan unless cover crop overflows. */
 function constrainView(next, fit, viewportWidth, viewportHeight) {
   const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, next.scale))
+  const panX = next.panU * fit.width
+  const panY = next.panV * fit.height
   const scaledW = fit.width * scale
   const scaledH = fit.height * scale
   const minPanX = viewportWidth - fit.x - scaledW
@@ -36,13 +45,13 @@ function constrainView(next, fit, viewportWidth, viewportHeight) {
   const canPan = minPanX < maxPanX - 0.5 || minPanY < maxPanY - 0.5
 
   if (scale <= MIN_SCALE && !canPan) {
-    return { scale: MIN_SCALE, panX: 0, panY: 0 }
+    return { scale: MIN_SCALE, panU: 0, panV: 0 }
   }
 
   return {
     scale,
-    panX: clampAxis(next.panX, minPanX, maxPanX),
-    panY: clampAxis(next.panY, minPanY, maxPanY),
+    panU: fit.width > 0 ? clampAxis(panX, minPanX, maxPanX) / fit.width : 0,
+    panV: fit.height > 0 ? clampAxis(panY, minPanY, maxPanY) / fit.height : 0,
   }
 }
 
@@ -81,12 +90,6 @@ export default function ZoomPanMedia({
     })
   }, [onViewChange])
 
-  useEffect(() => {
-    if (viewRef.current.scale > MIN_SCALE) {
-      commitView((prev) => prev)
-    }
-  }, [fit.width, fit.height, fit.x, fit.y, commitView])
-
   const syncFit = useCallback(() => {
     const viewport = viewportRef.current
     const img = imgRef.current
@@ -107,11 +110,10 @@ export default function ZoomPanMedia({
 
     const ro = new ResizeObserver(() => {
       syncFit()
-      onResetView()
     })
     ro.observe(viewport)
     return () => ro.disconnect()
-  }, [syncFit, onResetView])
+  }, [syncFit])
 
   const handleWheel = useCallback((event) => {
     event.preventDefault()
@@ -130,15 +132,17 @@ export default function ZoomPanMedia({
       const nextScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, prev.scale * factor))
       if (nextScale === prev.scale) return prev
 
-      const worldX = (mx - x - prev.panX) / prev.scale
-      const worldY = (my - y - prev.panY) / prev.scale
+      const panX = prev.panU * width
+      const panY = prev.panV * height
+      const worldX = (mx - x - panX) / prev.scale
+      const worldY = (my - y - panY) / prev.scale
       const u = width > 0 ? worldX / width : 0
       const v = height > 0 ? worldY / height : 0
 
       return {
         scale: nextScale,
-        panX: mx - x - u * width * nextScale,
-        panY: my - y - v * height * nextScale,
+        panU: width > 0 ? (mx - x - u * width * nextScale) / width : 0,
+        panV: height > 0 ? (my - y - v * height * nextScale) / height : 0,
       }
     })
   }, [commitView])
@@ -161,11 +165,12 @@ export default function ZoomPanMedia({
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
     setIsDragging(true)
+    const { panX, panY } = toPixelPan(current, fit)
     dragRef.current = {
       startX: event.clientX,
       startY: event.clientY,
-      panX: current.panX,
-      panY: current.panY,
+      panX,
+      panY,
     }
   }, [])
 
@@ -173,10 +178,11 @@ export default function ZoomPanMedia({
     if (!dragRef.current) return
     event.preventDefault()
     const drag = dragRef.current
-    commitView((prev) => ({
-      ...prev,
-      panX: drag.panX + event.clientX - drag.startX,
-      panY: drag.panY + event.clientY - drag.startY,
+    const { width, height } = fitRef.current
+    commitView(() => ({
+      scale: viewRef.current.scale,
+      panU: width > 0 ? (drag.panX + event.clientX - drag.startX) / width : 0,
+      panV: height > 0 ? (drag.panY + event.clientY - drag.startY) / height : 0,
     }))
   }, [commitView])
 
@@ -195,8 +201,9 @@ export default function ZoomPanMedia({
     onResetView()
   }, [onResetView])
 
-  const tx = fit.x + view.panX
-  const ty = fit.y + view.panY
+  const { panX, panY } = toPixelPan(view, fit)
+  const tx = fit.x + panX
+  const ty = fit.y + panY
 
   const viewport = viewportRef.current
   const canPan = viewport
